@@ -1,0 +1,42 @@
+const crypto = require('node:crypto');
+
+function emptyConfiguration() {
+  return {
+    embed: {
+      title: '',
+      description: '',
+      url: '',
+      color: null,
+      author: {},
+      footer: {},
+      thumbnail: '',
+      image: '',
+      fields: [],
+      timestamp: false,
+    },
+    buttons: [],
+  };
+}
+
+class BuilderSession {
+  constructor({ guildId, userId, templateName = '', configuration = emptyConfiguration(), mode = 'template', managedMessageId = null }) {
+    this.id = crypto.randomUUID();
+    this.guildId = guildId;
+    this.userId = userId;
+    this.templateName = templateName;
+    this.configuration = configuration;
+    this.mode = mode;
+    this.managedMessageId = managedMessageId;
+    this.section = 'home';
+    this.pending = {};
+    this.createdAt = new Date();
+    this.lastActivityAt = new Date();
+    this.saved = Boolean(templateName);
+  }
+
+  touch() {
+    this.lastActivityAt = new Date();
+  }
+}
+
+module.exports = { BuilderSession, emptyConfiguration };
