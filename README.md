@@ -60,7 +60,7 @@ Never commit `.env`. It is ignored by git.
 npm run deploy-commands
 ```
 
-Command deployment is intentionally separate from startup so the bot does not redeploy commands every time you run it.
+Commands are deployed automatically every time the bot starts. You can also run the deployment command separately when needed.
 
 ## Starting
 

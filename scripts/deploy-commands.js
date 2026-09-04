@@ -3,7 +3,7 @@ const config = require('../src/config');
 const commands = require('../src/commands/definitions');
 const logger = require('../src/utils/logger');
 
-async function main() {
+async function deployCommands() {
   const rest = new REST({ version: '10' }).setToken(config.token());
   const body = commands.map((command) => command.toJSON());
   const guildId = config.guildId();
@@ -17,7 +17,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  logger.error('Command deployment failed', { message: error.message });
-  process.exit(1);
-});
+if (require.main === module) {
+  deployCommands().catch((error) => {
+    logger.error('Command deployment failed', { message: error.message });
+    process.exit(1);
+  });
+}
+
+module.exports = { deployCommands };

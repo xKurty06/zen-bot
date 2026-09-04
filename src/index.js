@@ -6,6 +6,7 @@ const { initDatabase, closeDatabase } = require('./database/database');
 const { handleButton, handleSelect, handleModalSubmit, parseCustomId } = require('./interactions');
 const templateRepository = require('./database/repositories/templateRepository');
 const { assertCanManageEmbeds } = require('./services/permissionService');
+const { deployCommands } = require('../scripts/deploy-commands');
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -100,4 +101,14 @@ process.on('unhandledRejection', (error) => {
 });
 
 initDatabase();
-client.login(config.token());
+
+async function start() {
+  await deployCommands();
+  await client.login(config.token());
+}
+
+start().catch((error) => {
+  logger.error('Bot startup failed', { message: error.message });
+  closeDatabase();
+  process.exit(1);
+});
