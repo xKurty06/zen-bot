@@ -1,0 +1,6 @@
+module.exports = {
+  embed: require('./embed'),
+  ping: require('./ping'),
+  help: require('./help'),
+  about: require('./about'),
+};
