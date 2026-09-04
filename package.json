@@ -1,0 +1,30 @@
+{
+  "name": "zen-bot",
+  "version": "1.0.0",
+  "description": "Locally hosted Discord embed builder and content manager.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "deploy-commands": "node scripts/deploy-commands.js"
+  },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "embed-builder",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.24.2",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
