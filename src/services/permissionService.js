@@ -5,14 +5,13 @@ function canManageEmbeds(interaction) {
   const permissions = interaction.memberPermissions;
   return Boolean(
     permissions?.has(PermissionsBitField.Flags.Administrator) ||
-    permissions?.has(PermissionsBitField.Flags.ManageGuild) ||
-    permissions?.has(PermissionsBitField.Flags.ManageMessages),
+    permissions?.has(PermissionsBitField.Flags.ManageGuild),
   );
 }
 
 function assertCanManageEmbeds(interaction) {
   if (!canManageEmbeds(interaction)) {
-    throw new Error('You need Administrator, Manage Server, or Manage Messages permission to use the embed manager.');
+    throw new Error('You need Administrator or Manage Server permission to use the embed manager.');
   }
 }
 
