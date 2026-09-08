@@ -5,6 +5,15 @@ const commands = require('./commands');
 const { initDatabase, closeDatabase } = require('./database/database');
 const { handleButton, handleSelect, handleModalSubmit, parseCustomId } = require('./interactions');
 const templateRepository = require('./database/repositories/templateRepository');
+
+function autocompleteTemplateNames(guildId, query = '') {
+  const lowerQuery = query.trim().toLowerCase();
+  return templateRepository.list(guildId)
+    .map((template) => template.name)
+    .filter((name) => !lowerQuery || name.toLowerCase().includes(lowerQuery))
+    .slice(0, 25)
+    .map((name) => ({ name, value: name }));
+}
 const { assertCanManageEmbeds } = require('./services/permissionService');
 const { deployCommands } = require('../scripts/deploy-commands');
 
@@ -30,6 +39,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (!interaction.inGuild()) {
       await safeReply(interaction, 'This bot can only be used inside a Discord server.');
+      return;
+    }
+
+    if (interaction.isAutocomplete()) {
+      const focused = interaction.options.getFocused(true);
+      if (focused && (focused.name === 'name' || focused.name === 'from' || focused.name === 'to')) {
+        await interaction.respond(autocompleteTemplateNames(interaction.guildId, focused.value));
+        return;
+      }
+      await interaction.respond([]);
       return;
     }
 

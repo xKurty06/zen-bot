@@ -17,23 +17,21 @@ async function create(interaction) {
   await interaction.reply(renderBuilder(session));
 }
 
-async function edit(interaction) {
-  const type = interaction.options.getString('type', true);
-  if (type === 'template') {
-    const name = normalizeName(interaction.options.getString('name', true));
-    const template = templateRepository.findByName(interaction.guildId, name);
-    if (!template) throw new Error(`Template "${name}" was not found.`);
-    const session = sessionManager.create({
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-      templateName: template.name,
-      configuration: clone(template.configuration),
-      mode: 'template',
-    });
-    await interaction.reply(renderBuilder(session));
-    return;
-  }
+async function editTemplate(interaction) {
+  const name = normalizeName(interaction.options.getString('name', true));
+  const template = templateRepository.findByName(interaction.guildId, name);
+  if (!template) throw new Error(`Template "${name}" was not found.`);
+  const session = sessionManager.create({
+    guildId: interaction.guildId,
+    userId: interaction.user.id,
+    templateName: template.name,
+    configuration: clone(template.configuration),
+    mode: 'template',
+  });
+  await interaction.reply(renderBuilder(session));
+}
 
+async function editMessage(interaction) {
   const messageId = interaction.options.getString('message_id', true);
   const managed = managedMessageRepository.findByMessage(interaction.guildId, messageId);
   if (!managed) throw new Error('That message is not tracked as a managed message created by this bot.');
@@ -61,6 +59,40 @@ async function save(interaction) {
   session.templateName = saved.name;
   session.saved = true;
   await interaction.reply({ content: `Saved template "${saved.name}".`, ephemeral: true });
+}
+
+async function upload(interaction) {
+  const type = interaction.options.getString('type', true);
+  const attachment = interaction.options.getAttachment('image', true);
+
+  if (!attachment || !attachment.contentType?.startsWith('image/')) {
+    throw new Error('Please upload an image file.');
+  }
+
+  const session = sessionManager.latest(interaction.guildId, interaction.user.id);
+  if (!session) throw new Error('No active builder session was found. Use /embed create first.');
+
+  const typeLabelMap = {
+    thumbnail: 'thumbnail',
+    image: 'main image',
+    author_icon: 'author icon',
+    footer_icon: 'footer icon',
+  };
+
+  if (type === 'author_icon') {
+    session.configuration.embed.author = { ...(session.configuration.embed.author || {}), iconUrl: attachment.url };
+  } else if (type === 'footer_icon') {
+    session.configuration.embed.footer = { ...(session.configuration.embed.footer || {}), iconUrl: attachment.url };
+  } else {
+    session.configuration.embed[type] = attachment.url;
+  }
+
+  session.saved = false;
+
+  await interaction.reply({
+    content: `Updated the ${typeLabelMap[type] || type} with "${attachment.name}".`,
+    ephemeral: true,
+  });
 }
 
 async function list(interaction) {
@@ -157,7 +189,19 @@ async function info(interaction) {
 async function execute(interaction) {
   assertCanManageEmbeds(interaction);
   const subcommand = interaction.options.getSubcommand();
-  const handlers = { create, edit, save, list, preview, send, delete: deleteTemplate, duplicate, info };
+  const handlers = {
+    create,
+    'edit-template': editTemplate,
+    'edit-message': editMessage,
+    save,
+    upload,
+    list,
+    preview,
+    send,
+    delete: deleteTemplate,
+    duplicate,
+    info,
+  };
   await handlers[subcommand](interaction);
 }
 

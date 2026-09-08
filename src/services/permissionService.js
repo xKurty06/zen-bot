@@ -11,7 +11,7 @@ function canManageEmbeds(interaction) {
 
 function assertCanManageEmbeds(interaction) {
   if (!canManageEmbeds(interaction)) {
-    throw new Error('You need Administrator or Manage Server permission to use the embed manager.');
+    throw new Error('You do not have permission to use this command.');
   }
 }
 

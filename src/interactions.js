@@ -59,15 +59,15 @@ async function showEditModal(interaction, session, action, index = null) {
     modal_author: () => modal(customId, 'Edit Author', [
       input('name', 'Author Name', TextInputStyle.Short, embed.author?.name, false, 256),
       input('url', 'Author URL', TextInputStyle.Short, embed.author?.url, false, 500),
-      input('iconUrl', 'Author Icon URL', TextInputStyle.Short, embed.author?.iconUrl, false, 500),
+      input('iconUrl', 'Author Icon URL (or use /embed upload type:author_icon)', TextInputStyle.Short, embed.author?.iconUrl, false, 500),
     ]),
     modal_footer: () => modal(customId, 'Edit Footer', [
       input('text', 'Footer Text', TextInputStyle.Short, embed.footer?.text, false, 2048),
-      input('iconUrl', 'Footer Icon URL', TextInputStyle.Short, embed.footer?.iconUrl, false, 500),
+      input('iconUrl', 'Footer Icon URL (or use /embed upload type:footer_icon)', TextInputStyle.Short, embed.footer?.iconUrl, false, 500),
     ]),
     modal_color: () => modal(customId, 'Set Color', [input('color', 'Hex Color', TextInputStyle.Short, embed.color || '#5865F2', false, 7)]),
-    modal_thumbnail: () => modal(customId, 'Set Thumbnail', [input('url', 'Image URL', TextInputStyle.Short, embed.thumbnail, false, 500)]),
-    modal_image: () => modal(customId, 'Set Main Image', [input('url', 'Image URL', TextInputStyle.Short, embed.image, false, 500)]),
+    modal_thumbnail: () => modal(customId, 'Set Thumbnail', [input('url', 'Image URL (or use /embed upload type:thumbnail)', TextInputStyle.Short, embed.thumbnail, false, 500)]),
+    modal_image: () => modal(customId, 'Set Main Image', [input('url', 'Image URL (or use /embed upload type:image)', TextInputStyle.Short, embed.image, false, 500)]),
     modal_field_add: () => modal(customId, 'Add Field', [
       input('name', 'Field Name', TextInputStyle.Short, '', true, 256),
       input('value', 'Field Value', TextInputStyle.Paragraph, '', true, 1024),
