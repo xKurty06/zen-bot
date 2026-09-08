@@ -19,9 +19,21 @@ class SessionManager {
 
   get(guildId, userId, sessionId) {
     this.expire();
-    const session = this.sessions.get(this.key(guildId, userId, sessionId));
-    if (session) session.touch();
-    return session || null;
+
+    const key = this.key(guildId, userId, sessionId);
+    const exact = this.sessions.get(key);
+    if (exact) {
+      exact.touch();
+      return exact;
+    }
+
+    const latest = this.latest(guildId, userId);
+    if (latest) {
+      latest.touch();
+      return latest;
+    }
+
+    return null;
   }
 
   latest(guildId, userId) {

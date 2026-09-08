@@ -120,23 +120,23 @@ function buildControls(session) {
     case 'content':
       return [
         row(navButton(session, 'modal_title', 'Edit Title'), navButton(session, 'modal_description', 'Edit Description'), navButton(session, 'modal_url', 'Edit URL')),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
       ];
     case 'appearance':
       return [
         row(navButton(session, 'modal_color', 'Set Color'), navButton(session, 'clear_color', 'Clear Color'), navButton(session, 'toggle_timestamp', 'Toggle Timestamp')),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
       ];
     case 'media':
       return [
         row(navButton(session, 'modal_thumbnail', 'Set Thumbnail'), navButton(session, 'modal_image', 'Set Image')),
         row(navButton(session, 'remove_thumbnail', 'Remove Thumbnail'), navButton(session, 'remove_image', 'Remove Image')),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
       ];
     case 'fields':
       return [
         row(navButton(session, 'modal_field_add', 'Add Field')),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
         select(session, 'field_edit', 'Edit a field', indexOptions(session.configuration.embed.fields, 'No fields to edit')),
         select(session, 'field_remove', 'Remove a field', indexOptions(session.configuration.embed.fields, 'No fields to remove')),
         select(session, 'field_move_up', 'Move field up', indexOptions(session.configuration.embed.fields, 'No fields to move')),
@@ -145,7 +145,7 @@ function buildControls(session) {
     case 'buttons':
       return [
         row(navButton(session, 'modal_button_external', 'Add URL Button'), navButton(session, 'modal_button_channel', 'Add Channel Button')),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
         select(session, 'button_edit', 'Edit a button', indexOptions(session.configuration.buttons, 'No buttons to edit')),
         select(session, 'button_remove', 'Remove a button', indexOptions(session.configuration.buttons, 'No buttons to remove')),
         select(session, 'button_move_up', 'Move button up', indexOptions(session.configuration.buttons, 'No buttons to move')),
@@ -160,7 +160,7 @@ function buildControls(session) {
             : navButton(session, 'send_select', 'Send', ButtonStyle.Primary),
           navButton(session, 'cancel', 'Cancel', ButtonStyle.Danger),
         ),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
       ];
     case 'choose_channel_button':
       return [
@@ -172,7 +172,7 @@ function buildControls(session) {
             .setMaxValues(1)
             .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum),
         ),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'buttons'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'buttons')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'buttons'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'buttons')),
       ];
     case 'choose_send_channel':
       return [
@@ -184,7 +184,7 @@ function buildControls(session) {
             .setMaxValues(1)
             .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
         ),
-        row(navButton(session, 'section', 'Home', ButtonStyle.Secondary, 'settings'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'settings')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'settings'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'settings')),
       ];
     default:
       return [

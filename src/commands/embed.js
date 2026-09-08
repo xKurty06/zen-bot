@@ -186,9 +186,14 @@ async function info(interaction) {
   await interaction.reply({ content: 'Provide either a template name or a managed message ID.', ephemeral: true });
 }
 
+function normalizeSubcommandName(subcommand) {
+  return typeof subcommand === 'string' ? subcommand.trim().toLowerCase().replace(/_/g, '-') : subcommand;
+}
+
 async function execute(interaction) {
   assertCanManageEmbeds(interaction);
-  const subcommand = interaction.options.getSubcommand();
+  const rawSubcommand = interaction.options.getSubcommand();
+  const subcommand = normalizeSubcommandName(rawSubcommand);
   const handlers = {
     create,
     'edit-template': editTemplate,
@@ -202,7 +207,13 @@ async function execute(interaction) {
     duplicate,
     info,
   };
-  await handlers[subcommand](interaction);
+
+  const handler = handlers[subcommand] || handlers[rawSubcommand] || handlers[subcommand?.replace(/-/g, '_')];
+  if (typeof handler !== 'function') {
+    throw new Error(`Unsupported embed subcommand: ${rawSubcommand}`);
+  }
+
+  await handler(interaction);
 }
 
 module.exports = { execute };
