@@ -17,6 +17,7 @@ function createDuplicate({ guildId, fromName, toName, userId }) {
   const source = templateRepository.findByName(guildId, normalizeName(fromName));
   if (!source) throw new Error(`Template "${fromName}" was not found.`);
   const normalizedTarget = normalizeName(toName);
+  if (normalizedTarget === source.name) throw new Error('Choose a different name for the duplicate.');
   if (templateRepository.findByName(guildId, normalizedTarget)) {
     throw new Error(`Template "${normalizedTarget}" already exists.`);
   }

@@ -11,6 +11,7 @@ function initDatabase() {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
   db.exec(`
     CREATE TABLE IF NOT EXISTS embed_templates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -35,20 +35,6 @@ const embedCommand = new SlashCommandBuilder()
     .addStringOption((option) => option.setName('name').setDescription('Template name').setRequired(true).setAutocomplete(true))
     .addChannelOption((option) => option.setName('channel').setDescription('Destination channel').setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)))
   .addSubcommand((sub) => sub
-    .setName('upload')
-    .setDescription('Attach an image for the current builder session.')
-    .addStringOption((option) => option
-      .setName('type')
-      .setDescription('Which image to update')
-      .setRequired(true)
-      .addChoices(
-        { name: 'Thumbnail', value: 'thumbnail' },
-        { name: 'Main Image', value: 'image' },
-        { name: 'Author Icon', value: 'author_icon' },
-        { name: 'Footer Icon', value: 'footer_icon' },
-      ))
-    .addAttachmentOption((option) => option.setName('image').setDescription('Image file to upload').setRequired(true)))
-  .addSubcommand((sub) => sub
     .setName('delete')
     .setDescription('Delete a template after confirmation.')
     .addStringOption((option) => option.setName('name').setDescription('Template name').setRequired(true).setAutocomplete(true)))

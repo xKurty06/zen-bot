@@ -2,7 +2,11 @@ const { getDb } = require('../database');
 
 function rowToManaged(row) {
   if (!row) return null;
-  return { ...row, configuration: JSON.parse(row.configuration) };
+  try {
+    return { ...row, configuration: JSON.parse(row.configuration) };
+  } catch {
+    throw new Error(`Managed message "${row.message_id}" has corrupt configuration data.`);
+  }
 }
 
 class ManagedMessageRepository {
@@ -34,6 +38,16 @@ class ManagedMessageRepository {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(guildId, channelId, messageId, templateId, JSON.stringify(configuration), now, now);
     return this.findById(info.lastInsertRowid);
+  }
+
+  updateIfCurrent({ id, guildId, channelId, messageId, templateId, configuration, expectedUpdatedAt }) {
+    const now = new Date().toISOString();
+    const result = getDb().prepare(`
+      UPDATE managed_messages
+      SET channel_id = ?, template_id = ?, configuration = ?, updated_at = ?
+      WHERE id = ? AND guild_id = ? AND updated_at = ?
+    `).run(channelId, templateId, JSON.stringify(configuration), now, id, guildId, expectedUpdatedAt);
+    return result.changes ? this.findById(id) : null;
   }
 }
 

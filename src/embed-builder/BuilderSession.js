@@ -19,7 +19,7 @@ function emptyConfiguration() {
 }
 
 class BuilderSession {
-  constructor({ guildId, userId, templateName = '', configuration = emptyConfiguration(), mode = 'template', managedMessageId = null }) {
+  constructor({ guildId, userId, templateName = '', configuration = emptyConfiguration(), mode = 'template', managedMessageId = null, managedMessageUpdatedAt = null, saved = false }) {
     this.id = crypto.randomUUID();
     this.guildId = guildId;
     this.userId = userId;
@@ -27,15 +27,30 @@ class BuilderSession {
     this.configuration = configuration;
     this.mode = mode;
     this.managedMessageId = managedMessageId;
+    this.managedMessageUpdatedAt = managedMessageUpdatedAt;
     this.section = 'home';
     this.pending = {};
+    this.revision = 0;
     this.createdAt = new Date();
     this.lastActivityAt = new Date();
-    this.saved = Boolean(templateName);
+    this.saved = saved;
   }
 
   touch() {
     this.lastActivityAt = new Date();
+  }
+
+  transition(section) {
+    this.section = section;
+    this.pending = {};
+    this.revision += 1;
+    this.touch();
+  }
+
+  changed() {
+    this.saved = false;
+    this.revision += 1;
+    this.touch();
   }
 }
 

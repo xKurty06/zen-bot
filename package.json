@@ -4,6 +4,7 @@
   "description": "Locally hosted Discord embed builder and content manager.",
   "main": "src/index.js",
   "scripts": {
+    "test": "node --test",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "deploy-commands": "node scripts/deploy-commands.js"

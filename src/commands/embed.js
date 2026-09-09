@@ -6,6 +6,7 @@ const managedMessageRepository = require('../database/repositories/managedMessag
 const { assertCanManageEmbeds } = require('../services/permissionService');
 const { createDuplicate, normalizeName, saveTemplate } = require('../services/embedService');
 const { sendConfiguration } = require('../services/messageService');
+const { assertValidConfiguration } = require('../embed-builder/validators');
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -21,20 +22,24 @@ async function editTemplate(interaction) {
   const name = normalizeName(interaction.options.getString('name', true));
   const template = templateRepository.findByName(interaction.guildId, name);
   if (!template) throw new Error(`Template "${name}" was not found.`);
+  assertValidConfiguration(template.configuration);
   const session = sessionManager.create({
     guildId: interaction.guildId,
     userId: interaction.user.id,
     templateName: template.name,
     configuration: clone(template.configuration),
     mode: 'template',
+    saved: true,
   });
   await interaction.reply(renderBuilder(session));
 }
 
 async function editMessage(interaction) {
   const messageId = interaction.options.getString('message_id', true);
+  if (!/^\d{17,20}$/.test(messageId)) throw new Error('Enter a valid Discord message ID.');
   const managed = managedMessageRepository.findByMessage(interaction.guildId, messageId);
   if (!managed) throw new Error('That message is not tracked as a managed message created by this bot.');
+  assertValidConfiguration(managed.configuration);
   const session = sessionManager.create({
     guildId: interaction.guildId,
     userId: interaction.user.id,
@@ -42,8 +47,9 @@ async function editMessage(interaction) {
     configuration: clone(managed.configuration),
     mode: 'managed-message',
     managedMessageId: managed.id,
+    managedMessageUpdatedAt: managed.updated_at,
   });
-  session.section = 'settings';
+  session.transition('settings');
   await interaction.reply(renderBuilder(session));
 }
 
@@ -61,44 +67,10 @@ async function save(interaction) {
   await interaction.reply({ content: `Saved template "${saved.name}".`, ephemeral: true });
 }
 
-async function upload(interaction) {
-  const type = interaction.options.getString('type', true);
-  const attachment = interaction.options.getAttachment('image', true);
-
-  if (!attachment || !attachment.contentType?.startsWith('image/')) {
-    throw new Error('Please upload an image file.');
-  }
-
-  const session = sessionManager.latest(interaction.guildId, interaction.user.id);
-  if (!session) throw new Error('No active builder session was found. Use /embed create first.');
-
-  const typeLabelMap = {
-    thumbnail: 'thumbnail',
-    image: 'main image',
-    author_icon: 'author icon',
-    footer_icon: 'footer icon',
-  };
-
-  if (type === 'author_icon') {
-    session.configuration.embed.author = { ...(session.configuration.embed.author || {}), iconUrl: attachment.url };
-  } else if (type === 'footer_icon') {
-    session.configuration.embed.footer = { ...(session.configuration.embed.footer || {}), iconUrl: attachment.url };
-  } else {
-    session.configuration.embed[type] = attachment.url;
-  }
-
-  session.saved = false;
-
-  await interaction.reply({
-    content: `Updated the ${typeLabelMap[type] || type} with "${attachment.name}".`,
-    ephemeral: true,
-  });
-}
-
 async function list(interaction) {
-  const templates = templateRepository.list(interaction.guildId);
-  const content = templates.length
-    ? `Saved embeds:\n${templates.map((template) => `- ${template.name}`).join('\n')}`
+  const names = templateRepository.listNames(interaction.guildId);
+  const content = names.length
+    ? `Saved embeds:\n${names.map((name) => `- ${name}`).join('\n')}`
     : 'No templates saved yet.';
   await interaction.reply({ content, ephemeral: true });
 }
@@ -107,6 +79,7 @@ async function preview(interaction) {
   const name = normalizeName(interaction.options.getString('name', true));
   const template = templateRepository.findByName(interaction.guildId, name);
   if (!template) throw new Error(`Template "${name}" was not found.`);
+  assertValidConfiguration(template.configuration);
   await interaction.reply({
     content: `Preview: ${template.name}`,
     embeds: [toEmbed(template.configuration)],
@@ -132,9 +105,10 @@ async function send(interaction) {
 
 async function deleteTemplate(interaction) {
   const name = normalizeName(interaction.options.getString('name', true));
-  if (!templateRepository.findByName(interaction.guildId, name)) throw new Error(`Template "${name}" was not found.`);
+  const template = templateRepository.findMetadataByName(interaction.guildId, name);
+  if (!template) throw new Error(`Template "${name}" was not found.`);
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`template_delete_confirm:${name}`).setLabel('Delete').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`template_delete_confirm:${template.id}`).setLabel('Delete').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('template_delete_cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary),
   );
   await interaction.reply({ content: `Delete template "${name}"? This cannot be undone.`, components: [row], ephemeral: true });
@@ -156,6 +130,7 @@ async function info(interaction) {
   if (name) {
     const template = templateRepository.findByName(interaction.guildId, normalizeName(name));
     if (!template) throw new Error(`Template "${name}" was not found.`);
+    assertValidConfiguration(template.configuration);
     await interaction.reply({
       content: [
         `Template: ${template.name}`,
@@ -171,6 +146,7 @@ async function info(interaction) {
   if (messageId) {
     const managed = managedMessageRepository.findByMessage(interaction.guildId, messageId);
     if (!managed) throw new Error('That managed message was not found.');
+    assertValidConfiguration(managed.configuration);
     await interaction.reply({
       content: [
         `Managed message: ${managed.message_id}`,
@@ -199,7 +175,6 @@ async function execute(interaction) {
     'edit-template': editTemplate,
     'edit-message': editMessage,
     save,
-    upload,
     list,
     preview,
     send,

@@ -27,6 +27,10 @@ class SessionManager {
       return exact;
     }
 
+    // A component or modal always carries a session ID. Falling back here can
+    // route a stale interaction into a newer, unrelated builder session.
+    if (sessionId) return null;
+
     const latest = this.latest(guildId, userId);
     if (latest) {
       latest.touch();
@@ -56,3 +60,4 @@ class SessionManager {
 }
 
 module.exports = new SessionManager();
+module.exports.SessionManager = SessionManager;

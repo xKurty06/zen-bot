@@ -5,6 +5,23 @@ const managedMessageRepository = require('../database/repositories/managedMessag
 const templateRepository = require('../database/repositories/templateRepository');
 const { missingSendPermissions } = require('./permissionService');
 
+const managedMessageLocks = new Map();
+
+async function withManagedMessageLock(messageId, callback) {
+  const previous = managedMessageLocks.get(messageId) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => { release = resolve; });
+  const queued = previous.then(() => current);
+  managedMessageLocks.set(messageId, queued);
+  await previous;
+  try {
+    return await callback();
+  } finally {
+    release();
+    if (managedMessageLocks.get(messageId) === queued) managedMessageLocks.delete(messageId);
+  }
+}
+
 function assertSendableChannel(channel) {
   if (![ChannelType.GuildText, ChannelType.GuildAnnouncement].includes(channel.type)) {
     throw new Error('Choose a text or announcement channel.');
@@ -28,21 +45,52 @@ async function sendConfiguration({ guild, channel, clientUser, configuration, te
   });
 }
 
-async function updateManagedMessage({ client, guildId, managedRecord, configuration }) {
+async function updateManagedMessage({ client, guildId, managedRecord, configuration, expectedUpdatedAt }) {
   assertValidConfiguration(configuration);
   if (managedRecord.guild_id !== guildId) throw new Error('That managed message does not belong to this server.');
-  const channel = await client.channels.fetch(managedRecord.channel_id);
-  if (!channel) throw new Error('The original channel no longer exists.');
-  const message = await channel.messages.fetch(managedRecord.message_id);
-  if (!message) throw new Error('The original message no longer exists.');
-  if (message.author.id !== client.user.id) throw new Error('I will only edit messages created by this bot.');
-  await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration) });
-  return managedMessageRepository.save({
-    guildId,
-    channelId: channel.id,
-    messageId: message.id,
-    templateId: managedRecord.template_id,
-    configuration,
+  return withManagedMessageLock(managedRecord.id, async () => {
+    const current = managedMessageRepository.findById(managedRecord.id);
+    if (!current) throw new Error('That managed message is no longer tracked.');
+    if (expectedUpdatedAt && current.updated_at !== expectedUpdatedAt) {
+      throw new Error('This managed message was changed in another builder session. Reopen it before updating.');
+    }
+
+    let channel;
+    let message;
+    try {
+      channel = await client.channels.fetch(current.channel_id);
+      if (!channel?.messages) throw new Error('The original channel no longer exists or is no longer accessible.');
+      message = await channel.messages.fetch(current.message_id);
+    } catch (error) {
+      if (error.message.includes('channel no longer')) throw error;
+      throw new Error('I cannot fetch the original message. It may be deleted or I may lack View Channel/Read Message History permission.');
+    }
+    if (!message) throw new Error('The original message no longer exists.');
+    if (message.author.id !== client.user.id) throw new Error('I will only edit messages created by this bot.');
+
+    try {
+      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration) });
+    } catch {
+      throw new Error('I could not edit the original message. Check that I still have View Channel, Send Messages, and Embed Links permission.');
+    }
+
+    const saved = managedMessageRepository.updateIfCurrent({
+      id: current.id,
+      guildId,
+      channelId: channel.id,
+      messageId: message.id,
+      templateId: current.template_id,
+      configuration,
+      expectedUpdatedAt: current.updated_at,
+    });
+    if (saved) return saved;
+
+    try {
+      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration) });
+    } catch {
+      // The user receives a reconciliation warning below; do not hide the original persistence failure.
+    }
+    throw new Error('The message was edited but its tracking record changed at the same time. The bot restored the previous content when possible; reopen the message and try again.');
   });
 }
 

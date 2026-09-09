@@ -10,8 +10,12 @@ const {
 } = require('discord.js');
 const { validateConfiguration } = require('./validators');
 
-function id(session, action, value = '') {
-  return `eb:${session.id}:${action}${value !== '' ? `:${value}` : ''}`;
+function id(session, type, action, value = '') {
+  const parts = ['eb', session.id, String(session.revision), type, action];
+  if (value !== '') parts.push(String(value));
+  const customId = parts.join(':');
+  if (customId.length > 100) throw new Error(`Builder component ID is too long for ${type}:${action}.`);
+  return customId;
 }
 
 function hasContent(source) {
@@ -62,6 +66,7 @@ function toButtonRows(configuration) {
     });
     rows.push(row);
   }
+  validateComponentTree(rows, 'embed button components');
   return rows;
 }
 
@@ -70,22 +75,23 @@ function buttonSummary(configuration) {
   if (!buttons.length) return 'Buttons: none';
   return [
     'Buttons:',
-    ...buttons.map((button, index) => `${index + 1}. ${button.label}${button.destinationLabel ? ` -> ${button.destinationLabel}` : ` -> ${button.url}`}`),
+    ...buttons.map((button, index) => `${index + 1}. ${button.label}${button.destinationLabel ? ` -> ${button.destinationLabel}` : ` -> ${button.url}`}`.slice(0, 160)),
   ].join('\n');
 }
 
 function statusContent(session) {
   const errors = validateConfiguration(session.configuration);
-  return [
+  const content = [
     `Embed Builder`,
     `Template: ${session.templateName || '(unsaved draft)'}`,
     `Status: ${session.saved ? 'Saved' : 'Unsaved'}`,
     `Section: ${session.section}`,
     '',
-    'Media tip: upload files with /embed upload type:thumbnail, /embed upload type:image, /embed upload type:author_icon, or /embed upload type:footer_icon.',
+    'Media tip: use Set Thumbnail, Set Image, Edit Author, or Edit Footer to paste a URL or upload an image directly in the modal.',
     buttonSummary(session.configuration),
     errors.length ? `\nValidation:\n${errors.slice(0, 4).join('\n')}` : '',
   ].filter(Boolean).join('\n');
+  return content.length > 1_990 ? `${content.slice(0, 1_980)}\n…` : content;
 }
 
 function row(...buttons) {
@@ -93,13 +99,13 @@ function row(...buttons) {
 }
 
 function navButton(session, action, label, style = ButtonStyle.Secondary, value = '') {
-  return new ButtonBuilder().setCustomId(id(session, action, value)).setLabel(label).setStyle(style);
+  return new ButtonBuilder().setCustomId(id(session, 'button', action, value)).setLabel(label).setStyle(style);
 }
 
 function select(session, action, placeholder, options) {
   return new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(id(session, action))
+      .setCustomId(id(session, 'select', action))
       .setPlaceholder(placeholder)
       .addOptions(options),
   );
@@ -120,23 +126,22 @@ function buildControls(session) {
     case 'content':
       return [
         row(navButton(session, 'modal_title', 'Edit Title'), navButton(session, 'modal_description', 'Edit Description'), navButton(session, 'modal_url', 'Edit URL')),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'modal_author', 'Edit Author'), navButton(session, 'modal_footer', 'Edit Footer'), navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
       ];
     case 'appearance':
       return [
         row(navButton(session, 'modal_color', 'Set Color'), navButton(session, 'clear_color', 'Clear Color'), navButton(session, 'toggle_timestamp', 'Toggle Timestamp')),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
       ];
     case 'media':
       return [
         row(navButton(session, 'modal_thumbnail', 'Set Thumbnail'), navButton(session, 'modal_image', 'Set Image')),
         row(navButton(session, 'remove_thumbnail', 'Remove Thumbnail'), navButton(session, 'remove_image', 'Remove Image')),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
       ];
     case 'fields':
       return [
-        row(navButton(session, 'modal_field_add', 'Add Field')),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'modal_field_add', 'Add Field'), navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
         select(session, 'field_edit', 'Edit a field', indexOptions(session.configuration.embed.fields, 'No fields to edit')),
         select(session, 'field_remove', 'Remove a field', indexOptions(session.configuration.embed.fields, 'No fields to remove')),
         select(session, 'field_move_up', 'Move field up', indexOptions(session.configuration.embed.fields, 'No fields to move')),
@@ -144,8 +149,7 @@ function buildControls(session) {
       ];
     case 'buttons':
       return [
-        row(navButton(session, 'modal_button_external', 'Add URL Button'), navButton(session, 'modal_button_channel', 'Add Channel Button')),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'modal_button_external', 'Add URL Button'), navButton(session, 'modal_button_channel', 'Add Channel Button'), navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
         select(session, 'button_edit', 'Edit a button', indexOptions(session.configuration.buttons, 'No buttons to edit')),
         select(session, 'button_remove', 'Remove a button', indexOptions(session.configuration.buttons, 'No buttons to remove')),
         select(session, 'button_move_up', 'Move button up', indexOptions(session.configuration.buttons, 'No buttons to move')),
@@ -160,31 +164,31 @@ function buildControls(session) {
             : navButton(session, 'send_select', 'Send', ButtonStyle.Primary),
           navButton(session, 'cancel', 'Cancel', ButtonStyle.Danger),
         ),
-        row(navButton(session, 'section', 'Edit Menu', ButtonStyle.Secondary, 'home')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
       ];
     case 'choose_channel_button':
       return [
         new ActionRowBuilder().addComponents(
           new ChannelSelectMenuBuilder()
-            .setCustomId(id(session, 'button_channel_select'))
+            .setCustomId(id(session, 'select', 'button_channel_select'))
             .setPlaceholder('Choose the destination channel')
             .setMinValues(1)
             .setMaxValues(1)
             .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum),
         ),
-        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'buttons'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'buttons')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'buttons'), navButton(session, 'cancel_channel_button', 'Cancel', ButtonStyle.Secondary)),
       ];
     case 'choose_send_channel':
       return [
         new ActionRowBuilder().addComponents(
           new ChannelSelectMenuBuilder()
-            .setCustomId(id(session, 'send_channel_select'))
+            .setCustomId(id(session, 'select', 'send_channel_select'))
             .setPlaceholder('Choose where to post this embed')
             .setMinValues(1)
             .setMaxValues(1)
             .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
         ),
-        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'settings'), navButton(session, 'section', 'Cancel', ButtonStyle.Secondary, 'settings')),
+        row(navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'settings'), navButton(session, 'cancel_send_channel', 'Cancel', ButtonStyle.Secondary)),
       ];
     default:
       return [
@@ -202,12 +206,31 @@ function buildControls(session) {
 }
 
 function renderBuilder(session) {
-  return {
+  const payload = {
     content: statusContent(session),
     embeds: [toEmbed(session.configuration, { draft: true })],
     components: buildControls(session),
     ephemeral: true,
   };
+  validateComponentTree(payload.components, 'builder message');
+  return payload;
 }
 
-module.exports = { id, renderBuilder, toEmbed, toButtonRows };
+function validateComponentTree(rows, context = 'component tree') {
+  if (!Array.isArray(rows) || rows.length > 5) throw new Error(`${context} has more than five action rows.`);
+  const seen = new Set();
+  for (const rowValue of rows) {
+    const rowJson = typeof rowValue.toJSON === 'function' ? rowValue.toJSON() : rowValue;
+    const components = rowJson.components || [];
+    if (!components.length || components.length > 5) throw new Error(`${context} contains an invalid action row.`);
+    const selects = components.filter((component) => component.type === 3 || component.type === 8).length;
+    if (selects && components.length !== 1) throw new Error(`${context} mixes a select menu with other controls.`);
+    for (const component of components) {
+      if (!component.custom_id) continue; // Link buttons intentionally do not have custom IDs.
+      if (seen.has(component.custom_id)) throw new Error(`${context} contains duplicate custom_id "${component.custom_id}".`);
+      seen.add(component.custom_id);
+    }
+  }
+}
+
+module.exports = { id, renderBuilder, toEmbed, toButtonRows, validateComponentTree };

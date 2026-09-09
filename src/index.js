@@ -8,8 +8,7 @@ const templateRepository = require('./database/repositories/templateRepository')
 
 function autocompleteTemplateNames(guildId, query = '') {
   const lowerQuery = query.trim().toLowerCase();
-  return templateRepository.list(guildId)
-    .map((template) => template.name)
+  return templateRepository.listNames(guildId)
     .filter((name) => !lowerQuery || name.toLowerCase().includes(lowerQuery))
     .slice(0, 25)
     .map((name) => ({ name, value: name }));
@@ -66,9 +65,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
           await interaction.update({ content: 'Delete cancelled.', components: [] });
           return;
         }
-        const name = interaction.customId.replace('template_delete_confirm:', '');
-        const deleted = templateRepository.delete(interaction.guildId, name);
-        await interaction.update({ content: deleted ? `Deleted template "${name}".` : `Template "${name}" was already missing.`, components: [] });
+        const templateId = Number(interaction.customId.replace('template_delete_confirm:', ''));
+        if (!Number.isSafeInteger(templateId)) throw new Error('That delete confirmation is invalid.');
+        const template = templateRepository.findMetadataById(templateId);
+        if (!template || template.guild_id !== interaction.guildId) {
+          await interaction.update({ content: 'That template was already deleted or replaced.', components: [] });
+          return;
+        }
+        const deleted = templateRepository.deleteById(interaction.guildId, templateId);
+        await interaction.update({ content: deleted ? `Deleted template "${template.name}".` : `Template "${template.name}" was already missing.`, components: [] });
         return;
       }
       if (parseCustomId(interaction.customId)) {
@@ -88,11 +93,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.isModalSubmit()) {
       const parsed = parseCustomId(interaction.customId);
-      if (parsed) {
+      if (parsed && parsed.type === 'modal') {
         assertCanManageEmbeds(interaction);
         const sessionManager = require('./embed-builder/sessionManager');
         const session = sessionManager.get(interaction.guildId, interaction.user.id, parsed.sessionId);
         if (!session) throw new Error('This builder session has expired. Run /embed create again.');
+        if (session.revision !== parsed.revision) throw new Error('This builder modal is stale. Please use the latest builder message.');
         await handleModalSubmit(interaction, session, parsed.action, parsed.value);
       }
     }
