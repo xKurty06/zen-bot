@@ -27,6 +27,7 @@ function input(session, action, name, label, style = TextInputStyle.Short, value
 function fileInput(session, action) {
   const builder = new FileUploadBuilder()
     .setCustomId(id(session, 'file', action, 'upload'))
+    .setRequired(false)
     .setMinValues(0)
     .setMaxValues(1);
   return new LabelBuilder()

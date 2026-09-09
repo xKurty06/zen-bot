@@ -65,19 +65,25 @@ test('session lookup never falls back when a stale component provides a session 
   assert.equal(parsed.revision, 0);
 });
 
-test('media and icon editors expose Discord file-upload components in their modals', async () => {
+test('media and icon editors expose optional Discord file-upload components in their modals', async () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
-  const shown = [];
-  const interaction = {
-    guildId: 'guild',
-    user: { id: 'user' },
-    customId: id(session, 'button', 'modal_thumbnail'),
-    showModal: async (modal) => shown.push(modal.toJSON()),
-  };
   const manager = require('../src/embed-builder/sessionManager');
   manager.sessions?.clear?.();
   manager.sessions?.set?.(manager.key(session.guildId, session.userId, session.id), session);
-  await handleButton(interaction);
-  const components = shown[0].components.flatMap((component) => component.components || [component.component || component]);
-  assert.ok(components.some((component) => component.type === 19));
+
+  for (const action of ['modal_thumbnail', 'modal_image', 'modal_author', 'modal_footer']) {
+    const shown = [];
+    await handleButton({
+      guildId: 'guild',
+      user: { id: 'user' },
+      customId: id(session, 'button', action),
+      showModal: async (modal) => shown.push(modal.toJSON()),
+    });
+    const uploads = shown[0].components
+      .map((component) => component.component)
+      .filter((component) => component?.type === 19);
+    assert.equal(uploads.length, 1, `${action} should include one upload control`);
+    assert.equal(uploads[0].required, false, `${action} upload should be optional`);
+    assert.equal(uploads[0].min_values, 0, `${action} upload should permit no file`);
+  }
 });
