@@ -78,6 +78,6 @@ test('media and icon editors expose Discord file-upload components in their moda
   manager.sessions?.clear?.();
   manager.sessions?.set?.(manager.key(session.guildId, session.userId, session.id), session);
   await handleButton(interaction);
-  const components = shown[0].components.flatMap((row) => row.components);
+  const components = shown[0].components.flatMap((component) => component.components || [component.component || component]);
   assert.ok(components.some((component) => component.type === 19));
 });

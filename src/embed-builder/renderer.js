@@ -219,18 +219,29 @@ function renderBuilder(session) {
 function validateComponentTree(rows, context = 'component tree') {
   if (!Array.isArray(rows) || rows.length > 5) throw new Error(`${context} has more than five action rows.`);
   const seen = new Set();
-  for (const rowValue of rows) {
-    const rowJson = typeof rowValue.toJSON === 'function' ? rowValue.toJSON() : rowValue;
-    const components = rowJson.components || [];
-    if (!components.length || components.length > 5) throw new Error(`${context} contains an invalid action row.`);
-    const selects = components.filter((component) => component.type === 3 || component.type === 8).length;
-    if (selects && components.length !== 1) throw new Error(`${context} mixes a select menu with other controls.`);
-    for (const component of components) {
-      if (!component.custom_id) continue; // Link buttons intentionally do not have custom IDs.
+  const visit = (component, inActionRow = false) => {
+    if (component.custom_id) {
       if (seen.has(component.custom_id)) throw new Error(`${context} contains duplicate custom_id "${component.custom_id}".`);
       seen.add(component.custom_id);
     }
-  }
+    if (component.type === 18) {
+      if (!component.component) throw new Error(`${context} contains an invalid labeled component.`);
+      visit(component.component);
+      return;
+    }
+    if (component.type === 1) {
+      const children = component.components || [];
+      if (!children.length || children.length > 5) throw new Error(`${context} contains an invalid action row.`);
+      const selects = children.filter((child) => child.type === 3 || child.type === 8).length;
+      if (selects && children.length !== 1) throw new Error(`${context} mixes a select menu with other controls.`);
+      children.forEach((child) => visit(child, true));
+      return;
+    }
+    if (inActionRow && ![2, 3, 4, 8, 19].includes(component.type)) {
+      throw new Error(`${context} contains an unsupported action-row component.`);
+    }
+  };
+  rows.forEach((rowValue) => visit(typeof rowValue.toJSON === 'function' ? rowValue.toJSON() : rowValue));
 }
 
 module.exports = { id, renderBuilder, toEmbed, toButtonRows, validateComponentTree };

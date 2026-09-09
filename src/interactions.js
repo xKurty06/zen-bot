@@ -4,6 +4,7 @@ const {
   ButtonStyle,
   ModalBuilder,
   FileUploadBuilder,
+  LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
 } = require('discord.js');
@@ -28,7 +29,10 @@ function fileInput(session, action) {
     .setCustomId(id(session, 'file', action, 'upload'))
     .setMinValues(0)
     .setMaxValues(1);
-  return new ActionRowBuilder().addComponents(builder);
+  return new LabelBuilder()
+    .setLabel('Image upload (optional)')
+    .setDescription('Choose one image file, or leave this empty to use the URL field.')
+    .setFileUploadComponent(builder);
 }
 
 function modal(customId, title, rows) {
