@@ -75,7 +75,7 @@ function overwriteDifferences(category, channel, guild) {
 }
 function formatChannel(channel, differences) {
   if (!differences.length) return `${CATEGORY_SYNCED} #${channel.name} — SYNCED`;
-  const lines = [`${CATEGORY_NOT_SYNCED} #${channel.name} — NOT SYNCED`, ''];
+  const lines = [`\n${CATEGORY_NOT_SYNCED} #${channel.name} — NOT SYNCED`, ''];
   for (const difference of differences) {
     lines.push(difference.target);
     for (const permission of difference.permissions) {
@@ -88,11 +88,14 @@ function formatCategory(category, channels, guild) {
   const lines = [formatCategoryTitle(category.name)];
   if (!channels.length) return { lines: [...lines, '', 'No channels in this category.'], synced: 0, notSynced: 0 };
   let synced = 0; let notSynced = 0;
+  let index = 0;
   for (const [index, channel] of channels.entries()) {
     const differences = overwriteDifferences(category, channel, guild);
     if (differences.length) notSynced += 1; else synced += 1;
+    if (index === 0) lines.push('');
     lines.push(formatChannel(channel, differences));
-    if (index < channels.length - 1) { lines.push(''); if (differences.length) lines.push(''); }
+    index = 1;
+    if (index < channels.length - 1) {if (differences.length) lines.push(''); }
   }
   return { lines, synced, notSynced };
 }
