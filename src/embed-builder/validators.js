@@ -39,6 +39,7 @@ function validateText(errors, label, value) {
 
 function validateUrl(errors, label, value, requireHttps = false) {
   if (!value) return;
+  if (typeof value === 'string' && /^attachment:\/\/[a-f0-9-]{36}\.(?:jpg|png|webp|gif)$/i.test(value)) return;
   if (typeof value !== 'string') {
     errors.push(`${label} must be a URL.`);
     return;

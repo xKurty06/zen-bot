@@ -1,12 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { BuilderSession, emptyConfiguration } = require('../src/embed-builder/BuilderSession');
-const { renderBuilder, validateComponentTree } = require('../src/embed-builder/renderer');
+const { renderBuilder, toEmbed, validateComponentTree } = require('../src/embed-builder/renderer');
 const { normalizeName } = require('../src/services/embedService');
 const { validateConfiguration } = require('../src/embed-builder/validators');
 const { SessionManager } = require('../src/embed-builder/sessionManager');
 const { parseCustomId } = require('../src/interactions');
-const { handleButton } = require('../src/interactions');
+const { handleButton, handleModalSubmit, showBuilder } = require('../src/interactions');
 const { id } = require('../src/embed-builder/renderer');
 
 function ids(payload) {
@@ -65,6 +65,38 @@ test('session lookup never falls back when a stale component provides a session 
   assert.equal(parsed.revision, 0);
 });
 
+test('stale builder buttons refresh instead of returning an interaction error', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  session.changed();
+  const manager = require('../src/embed-builder/sessionManager');
+  manager.sessions?.clear?.();
+  manager.sessions?.set?.(manager.key(session.guildId, session.userId, session.id), session);
+  const updates = [];
+
+  await handleButton({
+    guildId: 'guild',
+    user: { id: 'user' },
+    customId: id(session, 'button', 'section', 'media').replace(`:${session.revision}:`, ':0:'),
+    update: async (payload) => updates.push(payload),
+  });
+
+  assert.match(updates[0].content, /^This builder was refreshed\./);
+  assert.equal(session.section, 'home');
+});
+
+test('expired builder buttons receive a direct ephemeral response', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  const replies = [];
+  await handleButton({
+    guildId: 'guild',
+    user: { id: 'user' },
+    customId: id(session, 'button', 'remove_thumbnail'),
+    reply: async (payload) => replies.push(payload),
+  });
+  assert.match(replies[0].content, /session has expired/);
+  assert.ok(replies[0].flags);
+});
+
 test('media and icon editors expose optional Discord file-upload components in their modals', async () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
   const manager = require('../src/embed-builder/sessionManager');
@@ -86,4 +118,76 @@ test('media and icon editors expose optional Discord file-upload components in t
     assert.equal(uploads[0].required, false, `${action} upload should be optional`);
     assert.equal(uploads[0].min_values, 0, `${action} upload should permit no file`);
   }
+});
+
+test('attachment-backed uploaded images remain valid embed media', () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  session.configuration.embed.image = 'attachment://d2719cbe-d3a8-4966-a9c9-320ddd398d28.png';
+  session.configuration.mediaAssets = {
+    'd2719cbe-d3a8-4966-a9c9-320ddd398d28.png': 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc',
+  };
+  assert.equal(validateConfiguration(session.configuration).length, 0);
+  assert.equal(toEmbed(session.configuration).toJSON().image.url, session.configuration.embed.image);
+});
+
+test('Discord-backed builder updates defer before reattaching media', async () => {
+  const filename = '11111111-1111-4111-8111-111111111111.png';
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  session.configuration.embed.image = `attachment://${filename}`;
+  session.configuration.mediaAssets = { [filename]: 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc' };
+  const calls = [];
+  const interaction = {
+    deferred: false,
+    replied: false,
+    deferUpdate: async () => { interaction.deferred = true; calls.push('defer'); },
+    editReply: async (payload) => calls.push(payload),
+    update: async () => { throw new Error('update should not be used for file-backed payloads'); },
+  };
+
+  await showBuilder(interaction, session);
+  assert.equal(calls[0], 'defer');
+  assert.equal(calls[1].files.length, 1);
+});
+
+test('modal uploads retain Discord URLs without creating local files', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  const calls = [];
+  const interaction = {
+    fields: {
+      getTextInputValue: () => '',
+      getUploadedFiles: () => ({ first: () => ({
+        contentType: 'image/png',
+        size: 1024,
+        url: 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc',
+      }) }),
+    },
+    deferUpdate: async () => { interaction.deferred = true; calls.push('defer'); },
+    editReply: async (payload) => calls.push(payload),
+    deferred: false,
+    user: { id: 'user' },
+    guildId: 'guild',
+  };
+
+  await handleModalSubmit(interaction, session, 'submit_modal_image', '');
+  assert.equal(calls[0], 'defer');
+  assert.match(session.configuration.embed.image, /^attachment:\/\//);
+  assert.equal(Object.keys(session.configuration.mediaAssets).length, 1);
+  assert.equal(calls[1].files.length, 1);
+});
+
+test('save modal does not look for a nonexistent upload field', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  session.configuration.embed.title = 'Welcome';
+  const calls = [];
+  await handleModalSubmit({
+    guildId: 'guild',
+    user: { id: 'user' },
+    fields: {
+      getTextInputValue: () => 'welcome-banner',
+      getUploadedFiles: () => { throw new Error('save modal should not query upload fields'); },
+    },
+    update: async (payload) => calls.push(payload),
+  }, session, 'submit_modal_save', '');
+  assert.equal(session.templateName, 'welcome-banner');
+  assert.equal(calls.length, 1);
 });

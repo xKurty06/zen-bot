@@ -9,6 +9,7 @@ const {
   StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const { validateConfiguration } = require('./validators');
+const { filesForConfiguration } = require('../services/mediaAssetService');
 
 function id(session, type, action, value = '') {
   const parts = ['eb', session.id, String(session.revision), type, action];
@@ -212,6 +213,8 @@ function renderBuilder(session) {
     components: buildControls(session),
     ephemeral: true,
   };
+  const files = filesForConfiguration(session.configuration);
+  if (files.length) payload.files = files;
   validateComponentTree(payload.components, 'builder message');
   return payload;
 }

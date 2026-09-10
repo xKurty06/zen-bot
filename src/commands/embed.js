@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const sessionManager = require('../embed-builder/sessionManager');
 const { renderBuilder, toEmbed, toButtonRows } = require('../embed-builder/renderer');
 const templateRepository = require('../database/repositories/templateRepository');
@@ -7,15 +7,32 @@ const { assertCanManageEmbeds } = require('../services/permissionService');
 const { createDuplicate, normalizeName, saveTemplate } = require('../services/embedService');
 const { sendConfiguration } = require('../services/messageService');
 const { assertValidConfiguration } = require('../embed-builder/validators');
+const { filesForConfiguration } = require('../services/mediaAssetService');
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+async function replyPayload(interaction, payload) {
+  if (interaction.deferred || interaction.replied) {
+    const { ephemeral, ...editablePayload } = payload;
+    return interaction.editReply(editablePayload);
+  }
+  return interaction.reply(payload);
+}
+
+async function deferForFiles(interaction, payload) {
+  if (payload.files?.length && !interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  }
+}
+
 async function create(interaction) {
   const name = interaction.options.getString('name') || '';
   const session = sessionManager.create({ guildId: interaction.guildId, userId: interaction.user.id, templateName: name ? normalizeName(name) : '' });
-  await interaction.reply(renderBuilder(session));
+  const payload = renderBuilder(session);
+  await deferForFiles(interaction, payload);
+  await replyPayload(interaction, payload);
 }
 
 async function editTemplate(interaction) {
@@ -31,7 +48,9 @@ async function editTemplate(interaction) {
     mode: 'template',
     saved: true,
   });
-  await interaction.reply(renderBuilder(session));
+  const payload = renderBuilder(session);
+  await deferForFiles(interaction, payload);
+  await replyPayload(interaction, payload);
 }
 
 async function editMessage(interaction) {
@@ -50,7 +69,9 @@ async function editMessage(interaction) {
     managedMessageUpdatedAt: managed.updated_at,
   });
   session.transition('settings');
-  await interaction.reply(renderBuilder(session));
+  const payload = renderBuilder(session);
+  await deferForFiles(interaction, payload);
+  await replyPayload(interaction, payload);
 }
 
 async function save(interaction) {
@@ -80,12 +101,15 @@ async function preview(interaction) {
   const template = templateRepository.findByName(interaction.guildId, name);
   if (!template) throw new Error(`Template "${name}" was not found.`);
   assertValidConfiguration(template.configuration);
-  await interaction.reply({
+  const payload = {
     content: `Preview: ${template.name}`,
     embeds: [toEmbed(template.configuration)],
     components: toButtonRows(template.configuration),
+    files: filesForConfiguration(template.configuration),
     ephemeral: true,
-  });
+  };
+  await deferForFiles(interaction, payload);
+  await replyPayload(interaction, payload);
 }
 
 async function send(interaction) {
@@ -93,6 +117,7 @@ async function send(interaction) {
   const channel = interaction.options.getChannel('channel', true);
   const template = templateRepository.findByName(interaction.guildId, name);
   if (!template) throw new Error(`Template "${name}" was not found.`);
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const record = await sendConfiguration({
     guild: interaction.guild,
     channel,
@@ -100,7 +125,7 @@ async function send(interaction) {
     configuration: template.configuration,
     templateName: template.name,
   });
-  await interaction.reply({ content: `Sent "${name}" to #${channel.name}. Managed message ID: ${record.message_id}`, ephemeral: true });
+  await interaction.editReply({ content: `Sent "${name}" to #${channel.name}. Managed message ID: ${record.message_id}` });
 }
 
 async function deleteTemplate(interaction) {

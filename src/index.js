@@ -1,4 +1,4 @@
-const { Client, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const config = require('./config');
 const logger = require('./utils/logger');
 const commands = require('./commands');
@@ -21,13 +21,17 @@ const client = new Client({
 });
 
 async function safeReply(interaction, content) {
-  const payload = { content, ephemeral: true, components: [], embeds: [] };
+  const payload = { content, flags: MessageFlags.Ephemeral, components: [], embeds: [] };
   try {
     if (interaction.deferred || interaction.replied) await interaction.editReply(payload);
     else await interaction.reply(payload);
   } catch (error) {
     logger.error('Failed to send interaction error response', { message: error.message });
   }
+}
+
+function isUnknownInteraction(error) {
+  return error?.code === 10062 || error?.rawError?.code === 10062 || error?.message === 'Unknown interaction';
 }
 
 client.once(Events.ClientReady, (readyClient) => {
@@ -103,6 +107,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
   } catch (error) {
+    if (isUnknownInteraction(error)) {
+      logger.warn('Interaction response expired before it could be acknowledged', { command: interaction.commandName, customId: interaction.customId });
+      return;
+    }
     logger.error('Interaction failed', { message: error.message, command: interaction.commandName, customId: interaction.customId });
     await safeReply(interaction, error.validationErrors ? error.validationErrors.join('\n') : error.message || 'Something went wrong.');
   }

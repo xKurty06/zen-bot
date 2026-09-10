@@ -15,6 +15,7 @@ function emptyConfiguration() {
       timestamp: false,
     },
     buttons: [],
+    mediaAssets: {},
   };
 }
 

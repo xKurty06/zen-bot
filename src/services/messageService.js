@@ -4,6 +4,7 @@ const { assertValidConfiguration } = require('../embed-builder/validators');
 const managedMessageRepository = require('../database/repositories/managedMessageRepository');
 const templateRepository = require('../database/repositories/templateRepository');
 const { missingSendPermissions } = require('./permissionService');
+const { filesForConfiguration } = require('./mediaAssetService');
 
 const managedMessageLocks = new Map();
 
@@ -34,7 +35,7 @@ async function sendConfiguration({ guild, channel, clientUser, configuration, te
   if (missing.length) throw new Error('I am missing permissions in that channel. Required: View Channel, Send Messages, Embed Links, Read Message History.');
   assertValidConfiguration(configuration);
 
-  const message = await channel.send({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration) });
+  const message = await channel.send({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), files: filesForConfiguration(configuration) });
   const template = templateName ? templateRepository.findByName(guild.id, templateName) : null;
   return managedMessageRepository.save({
     guildId: guild.id,
@@ -69,7 +70,7 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     if (message.author.id !== client.user.id) throw new Error('I will only edit messages created by this bot.');
 
     try {
-      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration) });
+      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), files: filesForConfiguration(configuration) });
     } catch {
       throw new Error('I could not edit the original message. Check that I still have View Channel, Send Messages, and Embed Links permission.');
     }
@@ -86,7 +87,7 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     if (saved) return saved;
 
     try {
-      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration) });
+      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration), files: filesForConfiguration(current.configuration) });
     } catch {
       // The user receives a reconciliation warning below; do not hide the original persistence failure.
     }

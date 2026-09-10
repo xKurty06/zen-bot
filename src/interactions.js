@@ -5,9 +5,11 @@ const {
   ModalBuilder,
   FileUploadBuilder,
   LabelBuilder,
+  MessageFlags,
   TextInputBuilder,
   TextInputStyle,
 } = require('discord.js');
+const crypto = require('node:crypto');
 const sessionManager = require('./embed-builder/sessionManager');
 const { id, renderBuilder, toEmbed, toButtonRows, validateComponentTree } = require('./embed-builder/renderer');
 const { parseColor, parseUrl, booleanFromInput } = require('./utils/validation');
@@ -46,6 +48,11 @@ async function showBuilder(interaction, session, message = null) {
   const payload = renderBuilder(session);
   if (message) payload.content = `${message}\n\n${payload.content}`;
   const { ephemeral, ...editablePayload } = payload;
+  // Reattaching Discord-hosted media can take longer than Discord's three-second
+  // initial-response window. Acknowledge first, then edit the builder response.
+  if (payload.files?.length && !interaction.deferred && !interaction.replied && typeof interaction.deferUpdate === 'function') {
+    await interaction.deferUpdate();
+  }
   if (interaction.deferred || interaction.replied) return interaction.editReply(editablePayload);
   return interaction.update(editablePayload);
 }
@@ -54,13 +61,6 @@ function parseCustomId(customId) {
   const [prefix, sessionId, revision, type, action, ...rest] = customId.split(':');
   if (prefix !== 'eb' || !sessionId || !/^\d+$/.test(revision) || !['button', 'select', 'modal'].includes(type) || !action) return null;
   return { sessionId, revision: Number(revision), type, action, value: rest.join(':') };
-}
-
-function getSession(interaction, parsed) {
-  const session = sessionManager.get(interaction.guildId, interaction.user.id, parsed.sessionId);
-  if (!session) throw new Error('This builder session has expired. Run /embed create again.');
-  if (session.revision !== parsed.revision) throw new Error('This builder control is stale. Please use the latest builder message.');
-  return session;
 }
 
 async function showEditModal(interaction, session, action, index = null) {
@@ -127,12 +127,34 @@ function read(fields, session, action, name) {
   return fields.getTextInputValue(id(session, 'input', action, name)).trim();
 }
 
-function uploadedImageUrl(fields, session, action) {
+function uploadedImageUrl(fields, session, action, target) {
   const files = fields.getUploadedFiles(id(session, 'file', action, 'upload'), false);
   const file = files?.first?.();
   if (!file) return '';
-  if (!file.contentType?.startsWith('image/')) throw new Error('Please upload an image file.');
-  return file.url;
+  const extensions = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+  const extension = extensions[file.contentType];
+  if (!extension) throw new Error('Please upload a JPG, PNG, WEBP, or GIF image.');
+  if (!file.url) throw new Error('Discord did not provide an image URL for this upload.');
+  let uploadUrl;
+  try {
+    uploadUrl = new URL(file.url);
+  } catch {
+    throw new Error('Discord provided an invalid image URL. Please upload it again.');
+  }
+  if (uploadUrl.protocol !== 'https:' || !['cdn.discordapp.com', 'media.discordapp.net'].includes(uploadUrl.hostname)) {
+    throw new Error('The uploaded image URL is not a trusted Discord attachment.');
+  }
+  const previousTarget = { image: 'image', thumbnail: 'thumbnail', authorIcon: 'authorIcon', footerIcon: 'footerIcon' }[target];
+  const previousValue = previousTarget === 'authorIcon'
+    ? session.configuration.embed.author?.iconUrl
+    : previousTarget === 'footerIcon' ? session.configuration.embed.footer?.iconUrl : session.configuration.embed[previousTarget];
+  const previousFilename = previousValue?.startsWith('attachment://') ? previousValue.slice('attachment://'.length) : null;
+  if (previousFilename) delete session.configuration.mediaAssets?.[previousFilename];
+  if (file.size != null && file.size > 25 * 1024 * 1024) throw new Error('Please upload an image smaller than 25 MB.');
+  const filename = `${crypto.randomUUID()}.${extension}`;
+  session.configuration.mediaAssets = session.configuration.mediaAssets || {};
+  session.configuration.mediaAssets[filename] = file.url;
+  return `attachment://${filename}`;
 }
 
 function assertExistingIndex(items, index, label) {
@@ -151,12 +173,20 @@ async function handleModalSubmit(interaction, session, action, value) {
   const index = value !== '' ? Number(value) : null;
   const editorAction = action.replace(/^submit_/, '');
   const valueOf = (name) => read(fields, session, editorAction, name);
+  const uploadActions = new Set(['modal_author', 'modal_footer', 'modal_thumbnail', 'modal_image']);
+  const uploadedFiles = uploadActions.has(editorAction)
+    ? fields.getUploadedFiles(id(session, 'file', editorAction, 'upload'), false)
+    : null;
+  const hasMedia = Object.keys(session.configuration.mediaAssets || {}).length > 0;
+  if ((uploadedFiles?.first?.() || hasMedia) && !interaction.deferred && !interaction.replied && typeof interaction.deferUpdate === 'function') {
+    await interaction.deferUpdate();
+  }
 
   if (action === 'submit_modal_title') embed.title = valueOf('title');
   if (action === 'submit_modal_description') embed.description = valueOf('description');
   if (action === 'submit_modal_url') embed.url = parseUrl(valueOf('url')) || '';
   if (action === 'submit_modal_author') {
-    const iconUrl = uploadedImageUrl(fields, session, editorAction) || parseUrl(valueOf('iconUrl'), { requireHttps: true }) || '';
+    const iconUrl = uploadedImageUrl(fields, session, editorAction, 'authorIcon') || parseUrl(valueOf('iconUrl'), { requireHttps: true }) || '';
     embed.author = {
       name: valueOf('name'),
       url: parseUrl(valueOf('url')) || '',
@@ -165,13 +195,13 @@ async function handleModalSubmit(interaction, session, action, value) {
     if (!embed.author.name) embed.author = {};
   }
   if (action === 'submit_modal_footer') {
-    const iconUrl = uploadedImageUrl(fields, session, editorAction) || parseUrl(valueOf('iconUrl'), { requireHttps: true }) || '';
+    const iconUrl = uploadedImageUrl(fields, session, editorAction, 'footerIcon') || parseUrl(valueOf('iconUrl'), { requireHttps: true }) || '';
     embed.footer = { text: valueOf('text'), iconUrl };
     if (!embed.footer.text) embed.footer = {};
   }
   if (action === 'submit_modal_color') embed.color = parseColor(valueOf('color'));
-  if (action === 'submit_modal_thumbnail') embed.thumbnail = uploadedImageUrl(fields, session, editorAction) || parseUrl(valueOf('url'), { requireHttps: true }) || '';
-  if (action === 'submit_modal_image') embed.image = uploadedImageUrl(fields, session, editorAction) || parseUrl(valueOf('url'), { requireHttps: true }) || '';
+  if (action === 'submit_modal_thumbnail') embed.thumbnail = uploadedImageUrl(fields, session, editorAction, 'thumbnail') || parseUrl(valueOf('url'), { requireHttps: true }) || '';
+  if (action === 'submit_modal_image') embed.image = uploadedImageUrl(fields, session, editorAction, 'image') || parseUrl(valueOf('url'), { requireHttps: true }) || '';
   if (action === 'submit_modal_field_add') {
     if (embed.fields.length >= 25) throw new Error('An embed can contain at most 25 fields.');
     embed.fields.push({ name: valueOf('name'), value: valueOf('value'), inline: booleanFromInput(valueOf('inline')) });
@@ -206,7 +236,9 @@ async function handleModalSubmit(interaction, session, action, value) {
 
   const payload = renderBuilder(session);
   const { ephemeral, ...editablePayload } = payload;
-  if (typeof interaction.update === 'function') {
+  if (interaction.deferred && typeof interaction.editReply === 'function') {
+    await interaction.editReply(editablePayload);
+  } else if (typeof interaction.update === 'function') {
     await interaction.update(editablePayload);
   } else {
     await interaction.reply(payload);
@@ -217,7 +249,15 @@ async function handleButton(interaction) {
   const parsed = parseCustomId(interaction.customId);
   if (!parsed) return false;
   if (parsed.type !== 'button') throw new Error('That builder control is invalid.');
-  const session = getSession(interaction, parsed);
+  const session = sessionManager.get(interaction.guildId, interaction.user.id, parsed.sessionId);
+  if (!session) {
+    await interaction.reply({ content: 'This builder session has expired. Run /embed create again.', flags: MessageFlags.Ephemeral });
+    return true;
+  }
+  if (session.revision !== parsed.revision) {
+    await showBuilder(interaction, session, 'This builder was refreshed.');
+    return true;
+  }
 
   if (parsed.action === 'section') {
     if (!['home', 'content', 'appearance', 'media', 'fields', 'buttons', 'settings'].includes(parsed.value)) throw new Error('That builder section is invalid.');
@@ -243,7 +283,10 @@ async function handleButton(interaction) {
     return true;
   }
   if (parsed.action === 'remove_thumbnail' || parsed.action === 'remove_image') {
-    session.configuration.embed[parsed.action === 'remove_thumbnail' ? 'thumbnail' : 'image'] = '';
+    const target = parsed.action === 'remove_thumbnail' ? 'thumbnail' : 'image';
+    const previous = session.configuration.embed[target];
+    if (previous?.startsWith('attachment://')) delete session.configuration.mediaAssets?.[previous.slice('attachment://'.length)];
+    session.configuration.embed[target] = '';
     session.changed();
     await showBuilder(interaction, session);
     return true;
@@ -288,7 +331,15 @@ async function handleSelect(interaction) {
   const parsed = parseCustomId(interaction.customId);
   if (!parsed) return false;
   if (parsed.type !== 'select') throw new Error('That builder control is invalid.');
-  const session = getSession(interaction, parsed);
+  const session = sessionManager.get(interaction.guildId, interaction.user.id, parsed.sessionId);
+  if (!session) {
+    await interaction.reply({ content: 'This builder session has expired. Run /embed create again.', flags: MessageFlags.Ephemeral });
+    return true;
+  }
+  if (session.revision !== parsed.revision) {
+    await showBuilder(interaction, session, 'This builder was refreshed.');
+    return true;
+  }
   const selected = interaction.values[0];
   if (selected === 'none') return showBuilder(interaction, session, 'There is nothing to select yet.');
   const index = Number(selected);
@@ -340,4 +391,4 @@ async function handleSelect(interaction) {
   return showBuilder(interaction, session);
 }
 
-module.exports = { handleButton, handleSelect, handleModalSubmit, parseCustomId };
+module.exports = { handleButton, handleSelect, handleModalSubmit, parseCustomId, showBuilder };
