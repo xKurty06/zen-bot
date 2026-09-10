@@ -65,6 +65,16 @@ function differentPermissions(categoryOverwrite, channelOverwrite) {
 function overwriteDifferences(category, channel, guild) {
   const categoryByTarget = overwritesByTarget(category.permissionOverwrites);
   const channelByTarget = overwritesByTarget(channel.permissionOverwrites);
+
+  logger.debug(`[checksync] overwriteDifferences for #${channel.name}`, {
+    categoryId: category.id,
+    channelId: channel.id,
+    categoryKeys: [...categoryByTarget.keys()],
+    channelKeys: [...channelByTarget.keys()],
+    categoryOverwrites: [...categoryByTarget.values()].map((o) => ({ ...o, allow: o.allow.toString(), deny: o.deny.toString() })),
+    channelOverwrites: [...channelByTarget.values()].map((o) => ({ ...o, allow: o.allow.toString(), deny: o.deny.toString() })),
+  });
+
   return [...new Set([...categoryByTarget.keys(), ...channelByTarget.keys()])]
     .map((key) => {
       const categoryOverwrite = categoryByTarget.get(key);
@@ -113,7 +123,7 @@ function childrenForCategory(category, channels) {
 }
 async function fetchGuildChannels(interaction) {
   try { return [...(await interaction.guild.channels.fetch()).values()].filter(Boolean); }
-  catch (error) { logger.error('Permission sync check could not fetch guild channels', { guildId: interaction.guildId, message: error.message }); throw new Error('I could not retrieve this server’s channels. Please check my server permissions and try again.'); }
+  catch (error) { logger.error('Permission sync check could not fetch guild channels', { guildId: interaction.guildId, message: error.message }); throw new Error('I could not retrieve this server\u2019s channels. Please check my server permissions and try again.'); }
 }
 function categoriesFrom(channels) { return channels.filter((channel) => channel.type === ChannelType.GuildCategory).sort((left, right) => left.rawPosition - right.rawPosition); }
 function categorySelect(categories, page, selectedCategoryId) {
