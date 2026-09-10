@@ -82,8 +82,8 @@ function formatCategory(category, channels, guild) {
   for (const [index, channel] of channels.entries()) {
     const differences = overwriteDifferences(category, channel, guild);
     if (differences.length) notSynced += 1; else synced += 1;
-    if (index > 0) lines.push('');
     lines.push(formatChannel(channel, differences));
+    if (index < channels.length - 1) lines.push('');
   }
   return { lines, synced, notSynced };
 }
