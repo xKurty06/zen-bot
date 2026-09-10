@@ -9,6 +9,7 @@ const { parseCustomId } = require('../src/interactions');
 const { handleButton, handleModalSubmit, showBuilder } = require('../src/interactions');
 const { id } = require('../src/embed-builder/renderer');
 const { canManageEmbeds } = require('../src/services/permissionService');
+const { formatUptime } = require('../src/commands/uptime');
 
 function ids(payload) {
   return payload.components.flatMap((row) => row.toJSON().components)
@@ -121,6 +122,12 @@ test('cancel explicitly clears uploaded message attachments', async () => {
     update: async (payload) => updates.push(payload),
   });
   assert.deepEqual(updates[0].attachments, []);
+});
+
+test('uptime formatter converts milliseconds into a readable duration', () => {
+  assert.equal(formatUptime((2 * 24 * 60 * 60 + 3 * 60 * 60 + 5 * 60 + 9) * 1000), '2d 3h 5m 9s');
+  assert.equal(formatUptime(5000), '5s');
+  assert.equal(formatUptime(3600000), '1h');
 });
 
 test('media and icon editors expose optional Discord file-upload components in their modals', async () => {

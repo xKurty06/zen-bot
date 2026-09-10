@@ -16,9 +16,11 @@ function autocompleteTemplateNames(guildId, query = '') {
 const { assertCanManageEmbeds } = require('./services/permissionService');
 const { deployCommands } = require('../scripts/deploy-commands');
 
+const botStartedAt = Date.now();
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
+client.uptimeStartedAt = botStartedAt;
 
 async function safeReply(interaction, content) {
   const payload = { content, flags: MessageFlags.Ephemeral, components: [], embeds: [] };

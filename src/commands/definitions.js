@@ -61,4 +61,8 @@ const aboutCommand = new SlashCommandBuilder()
   .setName('about')
   .setDescription('Show information about this bot.');
 
-module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand];
+const uptimeCommand = new SlashCommandBuilder()
+  .setName('uptime')
+  .setDescription('Show how long the bot has been online since startup.');
+
+module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand, uptimeCommand];

@@ -3,4 +3,5 @@ module.exports = {
   ping: require('./ping'),
   help: require('./help'),
   about: require('./about'),
+  uptime: require('./uptime'),
 };
