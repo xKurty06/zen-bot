@@ -78,9 +78,9 @@ test('channel reports list each target and avoid the leading blank line', () => 
   };
 
   const result = formatCategory(category, [channel], guild);
-  assert.match(result.lines.join('\n'), /#chat — NOT SYNCED\n@everyone/);
+  assert.match(result.lines.join('\n'), /<#chat> — NOT SYNCED\n@everyone/);
   assert.match(result.lines.join('\n'), /@everyone[\s\S]*Create Instant Invite/);
-  assert.doesNotMatch(result.lines.join('\n'), /#chat — NOT SYNCED\n\n@everyone/);
+  assert.doesNotMatch(result.lines.join('\n'), /<#chat> — NOT SYNCED\n\n@everyone/);
 });
 
 test('empty categories are represented without creating sync candidates', () => {

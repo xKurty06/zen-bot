@@ -35,13 +35,13 @@ function displayOverwriteTarget(guild, overwrite) {
   if (overwrite.type === '0') {
     const role = guild?.roles?.cache?.get(overwrite.id);
     if (overwrite.id === guild?.id || role?.name === '@everyone') return '@everyone';
-    return `@${role?.name || overwrite.id}`;
+    return `<@&${overwrite.id}>`;
   }
   const member = guild?.members?.cache?.get(overwrite.id);
   return `@${member?.user?.username || member?.displayName || overwrite.id}`;
 }
 function formatCategoryTitle(name) {
-  return `📁 Category: 「 ${String(name || 'UNKNOWN').trim().toUpperCase()} 」`;
+  return `📁 Category: ${String(name || 'UNKNOWN').trim().toUpperCase()}`;
 }
 function permissionName(name) { return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2'); }
 function permissionState(overwrite, permission) {
@@ -74,7 +74,7 @@ function overwriteDifferences(category, channel, guild) {
     .filter((difference) => difference.permissions.length);
 }
 function formatChannel(channel, differences) {
-  const status = differences.length ? `${CATEGORY_NOT_SYNCED} #${channel.name} — NOT SYNCED` : `${CATEGORY_SYNCED} #${channel.name} — SYNCED`;
+  const status = differences.length ? `${CATEGORY_NOT_SYNCED} <#${channel.id}> — NOT SYNCED` : `${CATEGORY_SYNCED} <#${channel.id}> — SYNCED`;
   const lines = [status];
   if (!differences.length) return lines.join('\n');
   for (const difference of differences) {
@@ -89,9 +89,10 @@ function formatCategory(category, channels, guild) {
   const lines = [formatCategoryTitle(category.name)];
   if (!channels.length) return { lines: [...lines, '', 'No channels in this category.'], synced: 0, notSynced: 0 };
   let synced = 0; let notSynced = 0;
+  let syncline = 0;
   for (const [index, channel] of channels.entries()) {
     const differences = overwriteDifferences(category, channel, guild);
-    if (differences.length) notSynced += 1; else synced += 1;
+    if (differences.length) { notSynced += 1; lines.push('────────────────────'); syncline = 0; } else { synced += 1; if (syncline === 0) lines.push('────────────────────'); syncline += 1; }
     if (index > 0) lines.push('');
     lines.push(formatChannel(channel, differences));
   }
