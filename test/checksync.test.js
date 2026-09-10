@@ -30,7 +30,7 @@ test('category results include only the permissions that differ', () => {
   const result = formatCategory(category, [channel], guild);
   assert.equal(result.notSynced, 1);
   assert.match(result.lines.join('\n'), /<@&role-a>/);
-  assert.match(result.lines.join('\n'), /<:bb_dot1:1547710117732950086>/);
+  assert.match(result.lines.join('\n'), /<:red_tick:1547706186386645012> #chat — NOT SYNCED/);
   assert.match(result.lines.join('\n'), /Create Instant Invite/);
   assert.match(result.lines.join('\n'), /Category <:bb_dot3:1547710157524303995> \| Channel <:bb_dot2:1547710239648911371>/);
 });

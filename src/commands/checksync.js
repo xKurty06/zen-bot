@@ -9,9 +9,11 @@ const MAX_CATEGORIES_PER_PAGE = 25;
 const MAX_CHANNELS_PER_PAGE = 12;
 const SELECT_PREFIX = 'checksync:category:';
 const PAGE_PREFIX = 'checksync:page:';
-const GREEN_TICK = '<:bb_dot3:1547710157524303995>';
-const RED_TICK = '<:bb_dot1:1547710117732950086>';
-const NOT_SET = '<:bb_dot2:1547710239648911371>';
+const CATEGORY_SYNCED = '<:green_tick:1547706115989442621>';
+const CATEGORY_NOT_SYNCED = '<:red_tick:1547706186386645012>';
+const PERMISSION_ALLOW = '<:bb_dot3:1547710157524303995>';
+const PERMISSION_DENY = '<:bb_dot1:1547710117732950086>';
+const PERMISSION_NOT_SET = '<:bb_dot2:1547710239648911371>';
 
 function normalizeOverwrite(overwrite) {
   return { id: overwrite.id, type: String(overwrite.type), allow: BigInt(overwrite.allow?.bitfield ?? overwrite.allow ?? 0), deny: BigInt(overwrite.deny?.bitfield ?? overwrite.deny ?? 0) };
@@ -40,9 +42,9 @@ function permissionState(overwrite, permission) {
   return 'Not Set';
 }
 function permissionStateIcon(state) {
-  if (state === 'Allow') return GREEN_TICK;
-  if (state === 'Deny') return RED_TICK;
-  return NOT_SET;
+  if (state === 'Allow') return PERMISSION_ALLOW;
+  if (state === 'Deny') return PERMISSION_DENY;
+  return PERMISSION_NOT_SET;
 }
 function differentPermissions(categoryOverwrite, channelOverwrite) {
   const unique = new Map();
@@ -63,8 +65,8 @@ function overwriteDifferences(category, channel, guild) {
     .filter((difference) => difference.permissions.length);
 }
 function formatChannel(channel, differences) {
-  if (!differences.length) return `${GREEN_TICK} #${channel.name} — SYNCED`;
-  const lines = [`${RED_TICK} #${channel.name} — NOT SYNCED`, ''];
+  if (!differences.length) return `${CATEGORY_SYNCED} #${channel.name} — SYNCED`;
+  const lines = [`${CATEGORY_NOT_SYNCED} #${channel.name} — NOT SYNCED`, ''];
   for (const difference of differences) {
     lines.push(difference.target);
     for (const permission of difference.permissions) {
@@ -131,7 +133,7 @@ function buildPayload(categories, channels, categoryPage, selectedCategoryId, re
   const report = formatCategory(category, children, guild);
   const start = resultPage * MAX_CHANNELS_PER_PAGE;
   const visibleReport = formatCategory(category, children.slice(start, start + MAX_CHANNELS_PER_PAGE), guild);
-  const description = [...visibleReport.lines, '', '────────────────────', 'Summary', `${GREEN_TICK} Synced: ${report.synced}`, `${RED_TICK} Not Synced: ${report.notSynced}`, `📊 Total: ${children.length}`, children.length > MAX_CHANNELS_PER_PAGE ? `Showing channels ${start + 1}–${Math.min(start + MAX_CHANNELS_PER_PAGE, children.length)} of ${children.length}.` : ''].filter(Boolean).join('\n');
+  const description = [...visibleReport.lines, '', '────────────────────', 'Summary', `${CATEGORY_SYNCED} Synced: ${report.synced}`, `${CATEGORY_NOT_SYNCED} Not Synced: ${report.notSynced}`, `📊 Total: ${children.length}`, children.length > MAX_CHANNELS_PER_PAGE ? `Showing channels ${start + 1}–${Math.min(start + MAX_CHANNELS_PER_PAGE, children.length)} of ${children.length}.` : ''].filter(Boolean).join('\n');
   return { embeds: [new EmbedBuilder().setColor(report.notSynced ? 0xFEE75C : 0x57F287).setTitle('🔐 Permission Sync Check').setDescription(description.slice(0, 4096))], components: controls(categories, categoryPage, category.id, resultPage, children), allowedMentions: { parse: [] } };
 }
 async function render(interaction, { categoryPage = 0, selectedCategoryId = null, resultPage = 0 } = {}) {
