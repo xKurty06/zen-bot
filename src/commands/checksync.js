@@ -72,7 +72,6 @@ function formatChannel(channel, differences) {
     for (const permission of difference.permissions) {
       lines.push(`• ${permission.name}: Category ${permissionStateIcon(permission.category)} | Channel ${permissionStateIcon(permission.channel)}`);
     }
-    lines.push('');
   }
   return lines.join('\n').trimEnd();
 }
@@ -80,10 +79,11 @@ function formatCategory(category, channels, guild) {
   const lines = [`📁 Category: ${category.name}`];
   if (!channels.length) return { lines: [...lines, '', 'No channels in this category.'], synced: 0, notSynced: 0 };
   let synced = 0; let notSynced = 0;
-  for (const channel of channels) {
+  for (const [index, channel] of channels.entries()) {
     const differences = overwriteDifferences(category, channel, guild);
     if (differences.length) notSynced += 1; else synced += 1;
-    lines.push('', formatChannel(channel, differences));
+    if (index > 0) lines.push('');
+    lines.push(formatChannel(channel, differences));
   }
   return { lines, synced, notSynced };
 }
