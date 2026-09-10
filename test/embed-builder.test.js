@@ -8,12 +8,23 @@ const { SessionManager } = require('../src/embed-builder/sessionManager');
 const { parseCustomId } = require('../src/interactions');
 const { handleButton, handleModalSubmit, showBuilder } = require('../src/interactions');
 const { id } = require('../src/embed-builder/renderer');
+const { canManageEmbeds } = require('../src/services/permissionService');
 
 function ids(payload) {
   return payload.components.flatMap((row) => row.toJSON().components)
     .map((component) => component.custom_id)
     .filter(Boolean);
 }
+
+test('embed manager role may use embed commands without guild management permissions', () => {
+  const interaction = {
+    inGuild: () => true,
+    memberPermissions: { has: () => false },
+    member: { roles: { cache: new Map([['1544590813579714600', true]]) } },
+  };
+
+  assert.equal(canManageEmbeds(interaction), true);
+});
 
 test('every builder view has unique component IDs and stays within Discord action-row limits', () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });

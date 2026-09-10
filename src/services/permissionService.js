@@ -1,11 +1,15 @@
 const { PermissionsBitField } = require('discord.js');
 
+const EMBED_MANAGER_ROLE_ID = '1544590813579714600';
+
 function canManageEmbeds(interaction) {
   if (!interaction.inGuild()) return false;
   const permissions = interaction.memberPermissions;
+  const hasEmbedManagerRole = interaction.member?.roles?.cache?.has(EMBED_MANAGER_ROLE_ID);
   return Boolean(
     permissions?.has(PermissionsBitField.Flags.Administrator) ||
-    permissions?.has(PermissionsBitField.Flags.ManageGuild),
+    permissions?.has(PermissionsBitField.Flags.ManageGuild) ||
+    hasEmbedManagerRole,
   );
 }
 
