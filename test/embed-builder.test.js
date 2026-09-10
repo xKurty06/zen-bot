@@ -135,6 +135,7 @@ test('Discord-backed builder updates defer before reattaching media', async () =
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
   session.configuration.embed.image = `attachment://${filename}`;
   session.configuration.mediaAssets = { [filename]: 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc' };
+  session.mediaDirty = true;
   const calls = [];
   const interaction = {
     deferred: false,
@@ -147,6 +148,12 @@ test('Discord-backed builder updates defer before reattaching media', async () =
   await showBuilder(interaction, session);
   assert.equal(calls[0], 'defer');
   assert.equal(calls[1].files.length, 1);
+  await showBuilder({
+    deferred: false,
+    replied: false,
+    update: async (payload) => calls.push(payload),
+  }, session);
+  assert.equal(calls[2].files, undefined);
 });
 
 test('modal uploads retain Discord URLs without creating local files', async () => {

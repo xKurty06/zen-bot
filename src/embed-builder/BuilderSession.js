@@ -31,6 +31,7 @@ class BuilderSession {
     this.managedMessageUpdatedAt = managedMessageUpdatedAt;
     this.section = 'home';
     this.pending = {};
+    this.mediaDirty = Boolean(configuration?.mediaAssets && Object.keys(configuration.mediaAssets).length);
     this.revision = 0;
     this.createdAt = new Date();
     this.lastActivityAt = new Date();

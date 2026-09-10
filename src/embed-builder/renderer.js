@@ -206,14 +206,16 @@ function buildControls(session) {
   }
 }
 
-function renderBuilder(session) {
+function renderBuilder(session, options = {}) {
   const payload = {
     content: statusContent(session),
     embeds: [toEmbed(session.configuration, { draft: true })],
     components: buildControls(session),
     ephemeral: true,
   };
-  const files = filesForConfiguration(session.configuration);
+  const files = options.includeFiles === false || session.mediaDirty === false
+    ? []
+    : filesForConfiguration(session.configuration);
   if (files.length) payload.files = files;
   validateComponentTree(payload.components, 'builder message');
   return payload;

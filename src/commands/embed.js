@@ -33,6 +33,7 @@ async function create(interaction) {
   const payload = renderBuilder(session);
   await deferForFiles(interaction, payload);
   await replyPayload(interaction, payload);
+  session.mediaDirty = false;
 }
 
 async function editTemplate(interaction) {
@@ -51,6 +52,7 @@ async function editTemplate(interaction) {
   const payload = renderBuilder(session);
   await deferForFiles(interaction, payload);
   await replyPayload(interaction, payload);
+  session.mediaDirty = false;
 }
 
 async function editMessage(interaction) {
@@ -72,6 +74,7 @@ async function editMessage(interaction) {
   const payload = renderBuilder(session);
   await deferForFiles(interaction, payload);
   await replyPayload(interaction, payload);
+  session.mediaDirty = false;
 }
 
 async function save(interaction) {

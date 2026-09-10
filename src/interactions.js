@@ -53,8 +53,11 @@ async function showBuilder(interaction, session, message = null) {
   if (payload.files?.length && !interaction.deferred && !interaction.replied && typeof interaction.deferUpdate === 'function') {
     await interaction.deferUpdate();
   }
-  if (interaction.deferred || interaction.replied) return interaction.editReply(editablePayload);
-  return interaction.update(editablePayload);
+  const result = interaction.deferred || interaction.replied
+    ? await interaction.editReply(editablePayload)
+    : await interaction.update(editablePayload);
+  session.mediaDirty = false;
+  return result;
 }
 
 function parseCustomId(customId) {
@@ -154,6 +157,7 @@ function uploadedImageUrl(fields, session, action, target) {
   const filename = `${crypto.randomUUID()}.${extension}`;
   session.configuration.mediaAssets = session.configuration.mediaAssets || {};
   session.configuration.mediaAssets[filename] = file.url;
+  session.mediaDirty = true;
   return `attachment://${filename}`;
 }
 
@@ -243,6 +247,7 @@ async function handleModalSubmit(interaction, session, action, value) {
   } else {
     await interaction.reply(payload);
   }
+  session.mediaDirty = false;
 }
 
 async function handleButton(interaction) {
