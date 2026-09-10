@@ -95,7 +95,7 @@ function formatCategory(category, channels, guild) {
     if (index === 0) lines.push('');
     lines.push(formatChannel(channel, differences));
     chindex = 1;
-    if (index < channels.length - 1) { lines.push('') ;if (differences.length); }
+    if (index < channels.length - 1) {if (differences.length) lines.push(''); else if (chindex) {lines.push(''); chindex = 0;}}
   }
   return { lines, synced, notSynced };
 }
