@@ -4,6 +4,7 @@ const logger = require('./utils/logger');
 const commands = require('./commands');
 const { initDatabase, closeDatabase } = require('./database/database');
 const { handleButton, handleSelect, handleModalSubmit, parseCustomId } = require('./interactions');
+const checksync = require('./commands/checksync');
 const templateRepository = require('./database/repositories/templateRepository');
 
 function autocompleteTemplateNames(guildId, query = '') {
@@ -13,7 +14,7 @@ function autocompleteTemplateNames(guildId, query = '') {
     .slice(0, 25)
     .map((name) => ({ name, value: name }));
 }
-const { assertCanManageEmbeds } = require('./services/permissionService');
+const { assertCanManageEmbeds, assertCanCheckPermissionSync } = require('./services/permissionService');
 const { deployCommands } = require('../scripts/deploy-commands');
 
 const botStartedAt = Date.now();
@@ -65,6 +66,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.isButton()) {
+      if (checksync.isCheckSyncComponent(interaction.customId)) {
+        assertCanCheckPermissionSync(interaction);
+        await checksync.handleButton(interaction);
+        return;
+      }
       if (interaction.customId.startsWith('template_delete_')) {
         assertCanManageEmbeds(interaction);
         if (interaction.customId === 'template_delete_cancel') {
@@ -90,6 +96,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     if (interaction.isAnySelectMenu()) {
+      if (checksync.isCheckSyncComponent(interaction.customId)) {
+        assertCanCheckPermissionSync(interaction);
+        await checksync.handleSelect(interaction);
+        return;
+      }
       if (parseCustomId(interaction.customId)) {
         assertCanManageEmbeds(interaction);
         await handleSelect(interaction);
