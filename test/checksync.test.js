@@ -47,6 +47,16 @@ test('overwrite differences omit matching permissions for changed targets', () =
   assert.deepEqual(overwriteDifferences(category, channel, guild)[0].permissions, [{ name: 'Kick Members', category: 'Allow', channel: 'Deny' }]);
 });
 
+test('channel entries include spacing between adjacent results', () => {
+  const category = { name: 'Community', permissionOverwrites: overwrites([]) };
+  const synced = { name: 'general', permissionOverwrites: overwrites([]) };
+  const unsynced = { name: 'staff', permissionOverwrites: overwrites([{ id: 'role-a', type: 0, allow: 1 }]) };
+  const guild = { id: 'guild', roles: { cache: new Map([['role-a', { name: 'Verified' }]]) }, members: { cache: new Map() } };
+  const result = formatCategory(category, [synced, unsynced], guild);
+  assert.match(result.lines.join('\n'), /#general — SYNCED\n\n<:red_tick:1547706186386645012> #staff — NOT SYNCED/);
+  assert.doesNotMatch(result.lines.join('\n'), /#general — SYNCED\n\n\n<:red_tick:1547706186386645012> #staff — NOT SYNCED/);
+});
+
 test('empty categories are represented without creating sync candidates', () => {
   const result = formatCategory({ name: 'Empty', permissionOverwrites: overwrites([]) }, [], { id: 'guild' });
   assert.deepEqual(result, { lines: ['📁 Category: Empty', '', 'No channels in this category.'], synced: 0, notSynced: 0 });
