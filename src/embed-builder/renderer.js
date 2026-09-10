@@ -217,6 +217,7 @@ function renderBuilder(session, options = {}) {
     ? []
     : filesForConfiguration(session.configuration);
   if (files.length) payload.files = files;
+  if (session.mediaDirty) payload.attachments = [];
   validateComponentTree(payload.components, 'builder message');
   return payload;
 }

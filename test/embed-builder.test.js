@@ -97,6 +97,21 @@ test('expired builder buttons receive a direct ephemeral response', async () => 
   assert.ok(replies[0].flags);
 });
 
+test('cancel explicitly clears uploaded message attachments', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  const manager = require('../src/embed-builder/sessionManager');
+  manager.sessions?.clear?.();
+  manager.sessions?.set?.(manager.key(session.guildId, session.userId, session.id), session);
+  const updates = [];
+  await handleButton({
+    guildId: 'guild',
+    user: { id: 'user' },
+    customId: id(session, 'button', 'cancel'),
+    update: async (payload) => updates.push(payload),
+  });
+  assert.deepEqual(updates[0].attachments, []);
+});
+
 test('media and icon editors expose optional Discord file-upload components in their modals', async () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
   const manager = require('../src/embed-builder/sessionManager');

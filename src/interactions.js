@@ -161,6 +161,13 @@ function uploadedImageUrl(fields, session, action, target) {
   return `attachment://${filename}`;
 }
 
+function clearAttachmentReference(session, value) {
+  if (typeof value === 'string' && value.startsWith('attachment://')) {
+    delete session.configuration.mediaAssets?.[value.slice('attachment://'.length)];
+  }
+  session.mediaDirty = true;
+}
+
 function assertExistingIndex(items, index, label) {
   if (!Number.isInteger(index) || index < 0 || index >= items.length) throw new Error(`That ${label} is no longer available. Please choose it again.`);
 }
@@ -204,8 +211,16 @@ async function handleModalSubmit(interaction, session, action, value) {
     if (!embed.footer.text) embed.footer = {};
   }
   if (action === 'submit_modal_color') embed.color = parseColor(valueOf('color'));
-  if (action === 'submit_modal_thumbnail') embed.thumbnail = uploadedImageUrl(fields, session, editorAction, 'thumbnail') || parseUrl(valueOf('url'), { requireHttps: true }) || '';
-  if (action === 'submit_modal_image') embed.image = uploadedImageUrl(fields, session, editorAction, 'image') || parseUrl(valueOf('url'), { requireHttps: true }) || '';
+  if (action === 'submit_modal_thumbnail') {
+    const uploaded = uploadedImageUrl(fields, session, editorAction, 'thumbnail');
+    if (!uploaded) clearAttachmentReference(session, embed.thumbnail);
+    embed.thumbnail = uploaded || parseUrl(valueOf('url'), { requireHttps: true }) || '';
+  }
+  if (action === 'submit_modal_image') {
+    const uploaded = uploadedImageUrl(fields, session, editorAction, 'image');
+    if (!uploaded) clearAttachmentReference(session, embed.image);
+    embed.image = uploaded || parseUrl(valueOf('url'), { requireHttps: true }) || '';
+  }
   if (action === 'submit_modal_field_add') {
     if (embed.fields.length >= 25) throw new Error('An embed can contain at most 25 fields.');
     embed.fields.push({ name: valueOf('name'), value: valueOf('value'), inline: booleanFromInput(valueOf('inline')) });
@@ -272,7 +287,7 @@ async function handleButton(interaction) {
   }
   if (parsed.action === 'cancel') {
     sessionManager.delete(session);
-    await interaction.update({ content: 'Builder session cancelled.', embeds: [], components: [] });
+    await interaction.update({ content: 'Builder session cancelled.', embeds: [], components: [], attachments: [] });
     return true;
   }
   if (parsed.action === 'clear_color') {
@@ -290,7 +305,7 @@ async function handleButton(interaction) {
   if (parsed.action === 'remove_thumbnail' || parsed.action === 'remove_image') {
     const target = parsed.action === 'remove_thumbnail' ? 'thumbnail' : 'image';
     const previous = session.configuration.embed[target];
-    if (previous?.startsWith('attachment://')) delete session.configuration.mediaAssets?.[previous.slice('attachment://'.length)];
+    clearAttachmentReference(session, previous);
     session.configuration.embed[target] = '';
     session.changed();
     await showBuilder(interaction, session);

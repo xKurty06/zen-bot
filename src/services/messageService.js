@@ -70,7 +70,7 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     if (message.author.id !== client.user.id) throw new Error('I will only edit messages created by this bot.');
 
     try {
-      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), files: filesForConfiguration(configuration) });
+      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), attachments: [], files: filesForConfiguration(configuration) });
     } catch {
       throw new Error('I could not edit the original message. Check that I still have View Channel, Send Messages, and Embed Links permission.');
     }
@@ -87,7 +87,7 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     if (saved) return saved;
 
     try {
-      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration), files: filesForConfiguration(current.configuration) });
+      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration), attachments: [], files: filesForConfiguration(current.configuration) });
     } catch {
       // The user receives a reconciliation warning below; do not hide the original persistence failure.
     }
