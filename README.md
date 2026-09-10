@@ -16,7 +16,7 @@ Previously posted messages remain visible when the bot is offline. Navigation bu
 - Template list, preview, save, duplicate, delete, and info commands
 - Send templates to selected channels and track managed messages
 - Edit previously posted messages created by this bot
-- `/ping`, `/help`, and `/about`
+- `/ping`, `/help`, `/about`, `/uptime`, and `/checksync`
 - Graceful shutdown for local start/stop usage
 
 ## Requirements
@@ -54,6 +54,8 @@ Never commit `.env`. It is ignored by git.
 4. Invite the bot with `applications.commands` and `bot` scopes.
 5. Grant only the permissions needed for your workflow: View Channel, Send Messages, Embed Links, and Read Message History. Attach Files is only needed if you later extend media upload handling.
 
+For `/checksync`, the bot must be able to view every category and child channel you want included in the report. The command is available by default to members with **Manage Channels** (and also accepts administrators or members with Manage Server at runtime).
+
 ## Command Deployment
 
 ```bash
@@ -86,6 +88,7 @@ npm run dev
 - `/embed duplicate from:<name> to:<name>` duplicates a template
 - `/embed delete name:<name>` asks for confirmation and deletes a template
 - `/embed info name:<name>` or `/embed info message_id:<id>` shows metadata
+- `/checksync` checks category child-channel permission overwrites and reports the roles or users that differ
 
 ## Offline Behavior
 

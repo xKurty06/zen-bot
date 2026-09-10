@@ -19,6 +19,22 @@ function assertCanManageEmbeds(interaction) {
   }
 }
 
+function canCheckPermissionSync(interaction) {
+  if (!interaction.inGuild()) return false;
+  const permissions = interaction.memberPermissions;
+  return Boolean(
+    permissions?.has(PermissionsBitField.Flags.Administrator) ||
+    permissions?.has(PermissionsBitField.Flags.ManageGuild) ||
+    permissions?.has(PermissionsBitField.Flags.ManageChannels),
+  );
+}
+
+function assertCanCheckPermissionSync(interaction) {
+  if (!canCheckPermissionSync(interaction)) {
+    throw new Error('You need the Manage Channels permission to use this command.');
+  }
+}
+
 function missingSendPermissions(channel, guildMember) {
   const permissions = channel.permissionsFor(guildMember);
   const required = [
@@ -30,4 +46,10 @@ function missingSendPermissions(channel, guildMember) {
   return required.filter((permission) => !permissions?.has(permission));
 }
 
-module.exports = { canManageEmbeds, assertCanManageEmbeds, missingSendPermissions };
+module.exports = {
+  canManageEmbeds,
+  assertCanManageEmbeds,
+  canCheckPermissionSync,
+  assertCanCheckPermissionSync,
+  missingSendPermissions,
+};

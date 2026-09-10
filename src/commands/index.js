@@ -4,4 +4,5 @@ module.exports = {
   help: require('./help'),
   about: require('./about'),
   uptime: require('./uptime'),
+  checksync: require('./checksync'),
 };

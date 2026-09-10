@@ -1,5 +1,6 @@
 const {
   ChannelType,
+  PermissionsBitField,
   SlashCommandBuilder,
 } = require('discord.js');
 
@@ -65,4 +66,9 @@ const uptimeCommand = new SlashCommandBuilder()
   .setName('uptime')
   .setDescription('Show how long the bot has been online since startup.');
 
-module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand, uptimeCommand];
+const checkSyncCommand = new SlashCommandBuilder()
+  .setName('checksync')
+  .setDescription('Check whether category channels have synchronized permissions.')
+  .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageChannels);
+
+module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand, uptimeCommand, checkSyncCommand];
