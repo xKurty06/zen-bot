@@ -62,6 +62,27 @@ test('channel entries include spacing between adjacent results', () => {
   assert.doesNotMatch(result.lines.join('\n'), /#general — SYNCED\n\n\n<:red_tick:1547706186386645012> #staff — NOT SYNCED/);
 });
 
+test('channel reports list each target and avoid the leading blank line', () => {
+  const category = { name: 'Community', permissionOverwrites: overwrites([
+    { id: 'role-a', type: 0, allow: 1 },
+    { id: 'role-b', type: 0, allow: 1 },
+  ]) };
+  const channel = { name: 'chat', permissionOverwrites: overwrites([
+    { id: 'role-a', type: 0, allow: 1 },
+    { id: 'role-b', type: 0, allow: 2 },
+  ]) };
+  const guild = {
+    id: 'guild',
+    roles: { cache: new Map([['role-a', { name: 'Constellation' }], ['role-b', { name: '@everyone' }]]) },
+    members: { cache: new Map() },
+  };
+
+  const result = formatCategory(category, [channel], guild);
+  assert.match(result.lines.join('\n'), /#chat — NOT SYNCED\n@everyone/);
+  assert.match(result.lines.join('\n'), /@everyone[\s\S]*Create Instant Invite/);
+  assert.doesNotMatch(result.lines.join('\n'), /#chat — NOT SYNCED\n\n@everyone/);
+});
+
 test('empty categories are represented without creating sync candidates', () => {
   const result = formatCategory({ name: 'Empty', permissionOverwrites: overwrites([]) }, [], { id: 'guild' });
   assert.deepEqual(result, { lines: ['📁 Category: 「 EMPTY 」', '', 'No channels in this category.'], synced: 0, notSynced: 0 });
