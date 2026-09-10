@@ -23,13 +23,18 @@ test('permission sync comparison reports added, removed, and changed targets', (
   assert.deepEqual(differentOverwriteTargets(category, channel).map((overwrite) => `${overwrite.type}:${overwrite.id}`).sort(), ['0:role-a', '0:role-b', '1:user-a']);
 });
 
-test('category results include only the permissions that differ', () => {
+test('category results include the expected category heading and readable role names', () => {
   const category = { id: 'category', name: 'Community', permissionOverwrites: overwrites([{ id: 'role-a', type: 0, allow: 1 }]) };
   const channel = { name: 'chat', permissionOverwrites: overwrites([{ id: 'role-a', type: 0, allow: 2 }]) };
-  const guild = { id: 'guild', roles: { cache: new Map([['role-a', { name: 'Verified' }]]) }, members: { cache: new Map() } };
+  const guild = {
+    id: 'guild',
+    roles: { cache: new Map([['role-a', { name: 'Verified' }], ['guild', { name: '@everyone' }]]) },
+    members: { cache: new Map() },
+  };
   const result = formatCategory(category, [channel], guild);
   assert.equal(result.notSynced, 1);
-  assert.match(result.lines.join('\n'), /<@&role-a>/);
+  assert.match(result.lines.join('\n'), /📁 Category: 「 COMMUNITY 」/);
+  assert.match(result.lines.join('\n'), /@Verified/);
   assert.match(result.lines.join('\n'), /<:red_tick:1547706186386645012> #chat — NOT SYNCED/);
   assert.match(result.lines.join('\n'), /Create Instant Invite/);
   assert.match(result.lines.join('\n'), /Category <:bb_dot3:1547710157524303995> \| Channel <:bb_dot2:1547710239648911371>/);
@@ -59,7 +64,7 @@ test('channel entries include spacing between adjacent results', () => {
 
 test('empty categories are represented without creating sync candidates', () => {
   const result = formatCategory({ name: 'Empty', permissionOverwrites: overwrites([]) }, [], { id: 'guild' });
-  assert.deepEqual(result, { lines: ['📁 Category: Empty', '', 'No channels in this category.'], synced: 0, notSynced: 0 });
+  assert.deepEqual(result, { lines: ['📁 Category: 「 EMPTY 」', '', 'No channels in this category.'], synced: 0, notSynced: 0 });
 });
 
 test('execute presents a category selector instead of multiple reports', async () => {
