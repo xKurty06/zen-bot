@@ -1,13 +1,12 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const sessionManager = require('../embed-builder/sessionManager');
-const { renderBuilder, toEmbed, toButtonRows } = require('../embed-builder/renderer');
+const { renderBuilder, toMessagePayload } = require('../embed-builder/renderer');
 const templateRepository = require('../database/repositories/templateRepository');
 const managedMessageRepository = require('../database/repositories/managedMessageRepository');
 const { assertCanManageEmbeds } = require('../services/permissionService');
 const { createDuplicate, normalizeName, saveTemplate } = require('../services/embedService');
 const { sendConfiguration } = require('../services/messageService');
 const { assertValidConfiguration } = require('../embed-builder/validators');
-const { filesForConfiguration } = require('../services/mediaAssetService');
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -105,10 +104,9 @@ async function preview(interaction) {
   if (!template) throw new Error(`Template "${name}" was not found.`);
   assertValidConfiguration(template.configuration);
   const payload = {
-    content: `Preview: ${template.name}`,
-    embeds: [toEmbed(template.configuration)],
-    components: toButtonRows(template.configuration),
-    files: filesForConfiguration(template.configuration),
+    ...toMessagePayload(template.configuration),
+    content: [`Preview: ${template.name}`, template.configuration.content || ''].filter(Boolean).join('\n\n') || undefined,
+    allowedMentions: { parse: [] },
     ephemeral: true,
   };
   await deferForFiles(interaction, payload);

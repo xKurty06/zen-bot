@@ -5,4 +5,7 @@ module.exports = {
   about: require('./about'),
   uptime: require('./uptime'),
   checksync: require('./checksync'),
+  notify: require('./notify'),
+  notifytest: require('./notifytest'),
+  rolecount: require('./rolecount'),
 };

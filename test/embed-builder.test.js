@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { BuilderSession, emptyConfiguration } = require('../src/embed-builder/BuilderSession');
-const { renderBuilder, toEmbed, validateComponentTree } = require('../src/embed-builder/renderer');
+const { renderBuilder, toEmbed, toMessagePayload, validateComponentTree } = require('../src/embed-builder/renderer');
 const { normalizeName } = require('../src/services/embedService');
 const { validateConfiguration } = require('../src/embed-builder/validators');
 const { SessionManager } = require('../src/embed-builder/sessionManager');
@@ -29,7 +29,7 @@ test('embed manager role may use embed commands without guild management permiss
 
 test('every builder view has unique component IDs and stays within Discord action-row limits', () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
-  for (const section of ['home', 'content', 'appearance', 'media', 'fields', 'buttons', 'settings', 'choose_channel_button', 'choose_send_channel']) {
+  for (const section of ['home', 'content', 'embed_content', 'appearance', 'media', 'fields', 'buttons', 'settings', 'choose_channel_button', 'choose_send_channel']) {
     session.section = section;
     const payload = renderBuilder(session);
     assert.ok(payload.components.length <= 5, `${section} has too many rows`);
@@ -65,6 +65,25 @@ test('configuration validation rejects malformed fields, insecure button URLs, a
   configuration.buttons[0].emoji = '<bad>';
   assert.match(validateConfiguration(configuration).join('\n'), /emoji is malformed/);
   assert.throws(() => validateComponentTree(new Array(6).fill({ components: [{}] })));
+});
+
+test('message content is separate from embed description and controls allowed mentions', () => {
+  const configuration = emptyConfiguration();
+  configuration.content = 'Hello <@123456789012345678> <@&223456789012345678> <#323456789012345678> @everyone';
+  configuration.embed.description = 'Embed body';
+  const payload = toMessagePayload(configuration);
+  assert.equal(payload.content, 'Hello <@123456789012345678> <@&223456789012345678> <#323456789012345678> @\u200beveryone');
+  assert.equal(payload.embeds[0].toJSON().description, 'Embed body');
+  assert.deepEqual(payload.allowedMentions, { parse: [], users: ['123456789012345678'], roles: ['223456789012345678'] });
+});
+
+test('message-only configurations validate without requiring embed content', () => {
+  const configuration = emptyConfiguration();
+  configuration.content = 'Plain **markdown** message';
+  assert.deepEqual(validateConfiguration(configuration), []);
+  assert.equal(toMessagePayload(configuration).embeds.length, 0);
+  configuration.content = 'x'.repeat(2001);
+  assert.match(validateConfiguration(configuration).join('\n'), /Message content is too long/);
 });
 
 test('session lookup never falls back when a stale component provides a session ID', () => {

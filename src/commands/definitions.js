@@ -71,4 +71,45 @@ const checkSyncCommand = new SlashCommandBuilder()
   .setDescription('Check whether category channels have synchronized permissions.')
   .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageChannels);
 
-module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand, uptimeCommand, checkSyncCommand];
+const notifyCommand = new SlashCommandBuilder()
+  .setName('notify')
+  .setDescription('Configure role-holder milestone notifications.')
+  .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+  .addSubcommand((sub) => sub
+    .setName('create')
+    .setDescription('Create a role-holder notification.')
+    .addRoleOption((option) => option.setName('role').setDescription('Role to monitor').setRequired(true))
+    .addIntegerOption((option) => option.setName('target').setDescription('Target holder count').setRequired(true).setMinValue(1).setMaxValue(100000))
+    .addChannelOption((option) => option.setName('channel').setDescription('Notification channel').setRequired(true).addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addMentionableOption((option) => option.setName('ping').setDescription('User or role to ping').setRequired(true)))
+  .addSubcommand((sub) => sub.setName('list').setDescription('List role-holder notifications.'))
+  .addSubcommand((sub) => sub
+    .setName('view')
+    .setDescription('View a notification configuration.')
+    .addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1)))
+  .addSubcommand((sub) => sub
+    .setName('edit')
+    .setDescription('Edit a notification configuration.')
+    .addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1))
+    .addRoleOption((option) => option.setName('role').setDescription('Replacement role to monitor'))
+    .addIntegerOption((option) => option.setName('target').setDescription('Replacement target holder count').setMinValue(1).setMaxValue(100000))
+    .addChannelOption((option) => option.setName('channel').setDescription('Replacement notification channel').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addMentionableOption((option) => option.setName('ping').setDescription('Replacement user or role to ping')))
+  .addSubcommand((sub) => sub.setName('enable').setDescription('Enable a notification.').addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1)))
+  .addSubcommand((sub) => sub.setName('disable').setDescription('Disable a notification.').addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1)))
+  .addSubcommand((sub) => sub.setName('reset').setDescription('Reset milestone progress.').addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1)))
+  .addSubcommand((sub) => sub.setName('delete').setDescription('Delete a notification.').addIntegerOption((option) => option.setName('id').setDescription('Notification ID').setRequired(true).setMinValue(1)));
+
+const notifyTestCommand = new SlashCommandBuilder()
+  .setName('notifytest')
+  .setDescription('Send a test notification without changing milestone progress.')
+  .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageGuild)
+  .addIntegerOption((option) => option.setName('id').setDescription('Notification ID; defaults to the first configuration').setMinValue(1));
+
+const roleCountCommand = new SlashCommandBuilder()
+  .setName('rolecount')
+  .setDescription('Count members with a selected role.')
+  .setDefaultMemberPermissions(PermissionsBitField.Flags.ManageChannels)
+  .addRoleOption((option) => option.setName('role').setDescription('Role to count').setRequired(true));
+
+module.exports = [embedCommand, pingCommand, helpCommand, aboutCommand, uptimeCommand, checkSyncCommand, notifyCommand, notifyTestCommand, roleCountCommand];

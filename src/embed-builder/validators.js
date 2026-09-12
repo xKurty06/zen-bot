@@ -11,6 +11,7 @@ const LIMITS = {
   actionRows: 5,
   buttonsPerRow: 5,
   buttonLabel: 80,
+  content: 2000,
 };
 
 function len(value) {
@@ -70,9 +71,11 @@ function validateConfiguration(configuration) {
   if (!embed || typeof embed !== 'object' || Array.isArray(embed)) return ['Embed configuration is missing a valid embed object.'];
   const fields = embed.fields || [];
   const buttons = configuration.buttons || [];
+  const content = configuration.content || '';
   const errors = [];
   if (!Array.isArray(fields)) return ['Embed fields must be a list.'];
   if (!Array.isArray(buttons)) return ['Embed buttons must be a list.'];
+  validateText(errors, 'Message content', content);
   validateText(errors, 'Title', embed.title);
   validateText(errors, 'Description', embed.description);
   validateText(errors, 'Embed URL', embed.url);
@@ -101,10 +104,11 @@ function validateConfiguration(configuration) {
     fields.length,
   );
 
-  if (!hasEmbedContent) {
-    errors.push('Add at least one embed property before saving or sending.');
+  if (!hasEmbedContent && !String(content || '').trim()) {
+    errors.push('Add message content or at least one embed property before saving or sending.');
   }
 
+  pushLimit(errors, 'Message content', len(content), LIMITS.content);
   pushLimit(errors, 'Title', len(embed.title), LIMITS.title);
   pushLimit(errors, 'Description', len(embed.description), LIMITS.description);
   pushLimit(errors, 'Author name', len(embed.author?.name), LIMITS.authorName);

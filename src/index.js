@@ -6,6 +6,7 @@ const { initDatabase, closeDatabase } = require('./database/database');
 const { handleButton, handleSelect, handleModalSubmit, parseCustomId } = require('./interactions');
 const checksync = require('./commands/checksync');
 const templateRepository = require('./database/repositories/templateRepository');
+const { handleGuildMemberAdd } = require('./services/notificationService');
 
 function autocompleteTemplateNames(guildId, query = '') {
   const lowerQuery = query.trim().toLowerCase();
@@ -19,7 +20,7 @@ const { deployCommands } = require('../scripts/deploy-commands');
 
 const botStartedAt = Date.now();
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 client.uptimeStartedAt = botStartedAt;
 
@@ -39,6 +40,14 @@ function isUnknownInteraction(error) {
 
 client.once(Events.ClientReady, (readyClient) => {
   logger.info(`Bot started as ${readyClient.user.tag}`);
+});
+
+client.on(Events.GuildMemberAdd, async (member) => {
+  try {
+    await handleGuildMemberAdd(client, member);
+  } catch (error) {
+    logger.error('Role notification evaluation failed after member join', { guildId: member.guild.id, message: error.message });
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

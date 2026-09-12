@@ -36,6 +36,27 @@ function initDatabase() {
       UNIQUE(guild_id, channel_id, message_id),
       FOREIGN KEY(template_id) REFERENCES embed_templates(id) ON DELETE SET NULL
     );
+
+    CREATE TABLE IF NOT EXISTS role_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      role_id TEXT NOT NULL,
+      target_count INTEGER NOT NULL,
+      channel_id TEXT NOT NULL,
+      ping_type TEXT NOT NULL,
+      ping_id TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      milestone_20_triggered INTEGER NOT NULL DEFAULT 0,
+      milestone_10_triggered INTEGER NOT NULL DEFAULT 0,
+      milestone_5_triggered INTEGER NOT NULL DEFAULT 0,
+      target_triggered INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_role_notifications_guild_role
+      ON role_notifications (guild_id, role_id, enabled);
   `);
   logger.info('Database initialized');
   return db;

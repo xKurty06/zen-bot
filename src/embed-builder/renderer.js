@@ -5,11 +5,14 @@ const {
   ChannelSelectMenuBuilder,
   ChannelType,
   EmbedBuilder,
+  RoleSelectMenuBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  UserSelectMenuBuilder,
 } = require('discord.js');
 const { validateConfiguration } = require('./validators');
 const { filesForConfiguration } = require('../services/mediaAssetService');
+const { extractAllowedMentions, neutralizeMassMentions } = require('../utils/mentions');
 
 function id(session, type, action, value = '') {
   const parts = ['eb', session.id, String(session.revision), type, action];
@@ -52,6 +55,26 @@ function toEmbed(configuration, options = {}) {
   return embed;
 }
 
+function toEmbeds(configuration, options = {}) {
+  if (!options.draft && !hasContent(configuration.embed || {})) return [];
+  return [toEmbed(configuration, options)];
+}
+
+function messageContent(configuration) {
+  const content = neutralizeMassMentions(configuration.content || '').trim();
+  return content || undefined;
+}
+
+function toMessagePayload(configuration, options = {}) {
+  return {
+    content: messageContent(configuration),
+    embeds: toEmbeds(configuration),
+    components: toButtonRows(configuration),
+    files: options.includeFiles === false ? [] : filesForConfiguration(configuration),
+    allowedMentions: extractAllowedMentions(configuration.content || ''),
+  };
+}
+
 function toButtonRows(configuration) {
   const rows = [];
   const buttons = configuration.buttons || [];
@@ -82,7 +105,11 @@ function buttonSummary(configuration) {
 
 function statusContent(session) {
   const errors = validateConfiguration(session.configuration);
+  const draftContent = messageContent(session.configuration);
   const content = [
+    'Message Content Preview:',
+    draftContent || '(empty)',
+    '',
     `Embed Builder`,
     `Template: ${session.templateName || '(unsaved draft)'}`,
     `Status: ${session.saved ? 'Saved' : 'Unsaved'}`,
@@ -125,6 +152,13 @@ function indexOptions(items, emptyLabel = 'No items') {
 function buildControls(session) {
   switch (session.section) {
     case 'content':
+      return [
+        row(navButton(session, 'modal_message_content', 'Message Content'), navButton(session, 'clear_message_content', 'Clear Message'), navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
+        new ActionRowBuilder().addComponents(new RoleSelectMenuBuilder().setCustomId(id(session, 'select', 'insert_role_mention')).setPlaceholder('Insert a role mention').setMinValues(1).setMaxValues(1)),
+        new ActionRowBuilder().addComponents(new UserSelectMenuBuilder().setCustomId(id(session, 'select', 'insert_user_mention')).setPlaceholder('Insert a user mention').setMinValues(1).setMaxValues(1)),
+        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId(id(session, 'select', 'insert_channel_mention')).setPlaceholder('Insert a channel mention').setMinValues(1).setMaxValues(1)),
+      ];
+    case 'embed_content':
       return [
         row(navButton(session, 'modal_title', 'Edit Title'), navButton(session, 'modal_description', 'Edit Description'), navButton(session, 'modal_url', 'Edit URL')),
         row(navButton(session, 'modal_author', 'Edit Author'), navButton(session, 'modal_footer', 'Edit Footer'), navButton(session, 'section', 'Back', ButtonStyle.Secondary, 'home')),
@@ -193,8 +227,9 @@ function buildControls(session) {
       ];
     default:
       return [
-        row(navButton(session, 'section', 'Content', ButtonStyle.Primary, 'content'), navButton(session, 'section', 'Appearance', ButtonStyle.Primary, 'appearance'), navButton(session, 'section', 'Media', ButtonStyle.Primary, 'media')),
-        row(navButton(session, 'section', 'Fields', ButtonStyle.Primary, 'fields'), navButton(session, 'section', 'Buttons', ButtonStyle.Primary, 'buttons'), navButton(session, 'section', 'Settings', ButtonStyle.Primary, 'settings')),
+        row(navButton(session, 'section', 'Content', ButtonStyle.Primary, 'content'), navButton(session, 'section', 'Embed', ButtonStyle.Primary, 'embed_content'), navButton(session, 'section', 'Appearance', ButtonStyle.Primary, 'appearance')),
+        row(navButton(session, 'section', 'Media', ButtonStyle.Primary, 'media'), navButton(session, 'section', 'Fields', ButtonStyle.Primary, 'fields'), navButton(session, 'section', 'Buttons', ButtonStyle.Primary, 'buttons')),
+        row(navButton(session, 'section', 'Settings', ButtonStyle.Primary, 'settings')),
         row(
           navButton(session, 'modal_save', 'Save', ButtonStyle.Success),
           session.mode === 'managed-message'
@@ -238,16 +273,16 @@ function validateComponentTree(rows, context = 'component tree') {
     if (component.type === 1) {
       const children = component.components || [];
       if (!children.length || children.length > 5) throw new Error(`${context} contains an invalid action row.`);
-      const selects = children.filter((child) => child.type === 3 || child.type === 8).length;
+      const selects = children.filter((child) => [3, 5, 6, 7, 8].includes(child.type)).length;
       if (selects && children.length !== 1) throw new Error(`${context} mixes a select menu with other controls.`);
       children.forEach((child) => visit(child, true));
       return;
     }
-    if (inActionRow && ![2, 3, 4, 8, 19].includes(component.type)) {
+    if (inActionRow && ![2, 3, 4, 5, 6, 7, 8, 19].includes(component.type)) {
       throw new Error(`${context} contains an unsupported action-row component.`);
     }
   };
   rows.forEach((rowValue) => visit(typeof rowValue.toJSON === 'function' ? rowValue.toJSON() : rowValue));
 }
 
-module.exports = { id, renderBuilder, toEmbed, toButtonRows, validateComponentTree };
+module.exports = { id, renderBuilder, toEmbed, toEmbeds, toButtonRows, toMessagePayload, validateComponentTree };

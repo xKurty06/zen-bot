@@ -11,13 +11,14 @@ const {
 } = require('discord.js');
 const crypto = require('node:crypto');
 const sessionManager = require('./embed-builder/sessionManager');
-const { id, renderBuilder, toEmbed, toButtonRows, validateComponentTree } = require('./embed-builder/renderer');
+const { id, renderBuilder, toButtonRows, toMessagePayload, validateComponentTree } = require('./embed-builder/renderer');
 const { parseColor, parseUrl, booleanFromInput } = require('./utils/validation');
 const { channelUrl } = require('./utils/discordUrls');
 const { saveTemplate } = require('./services/embedService');
 const { sendConfiguration, updateManagedMessage } = require('./services/messageService');
 const managedMessageRepository = require('./database/repositories/managedMessageRepository');
 const logger = require('./utils/logger');
+const { appendMention } = require('./utils/mentions');
 
 function input(session, action, name, label, style = TextInputStyle.Short, value = '', required = false, maxLength = undefined) {
   const builder = new TextInputBuilder().setCustomId(id(session, 'input', action, name)).setLabel(label).setStyle(style).setRequired(required);
@@ -76,6 +77,7 @@ async function showEditModal(interaction, session, action, index = null) {
 
   const modals = {
     modal_title: () => modal(customId, 'Edit Title', [formInput('title', 'Title', TextInputStyle.Short, embed.title, false, 256)]),
+    modal_message_content: () => modal(customId, 'Edit Message Content', [formInput('content', 'Message Content', TextInputStyle.Paragraph, session.configuration.content || '', false, 2000)]),
     modal_description: () => modal(customId, 'Edit Description', [formInput('description', 'Description', TextInputStyle.Paragraph, embed.description, false, 4000)]),
     modal_url: () => modal(customId, 'Edit Title URL', [formInput('url', 'URL', TextInputStyle.Short, embed.url, false, 500)]),
     modal_author: () => modal(customId, 'Edit Author', [
@@ -130,6 +132,10 @@ function read(fields, session, action, name) {
   return fields.getTextInputValue(id(session, 'input', action, name)).trim();
 }
 
+function readRaw(fields, session, action, name) {
+  return fields.getTextInputValue(id(session, 'input', action, name));
+}
+
 function uploadedImageUrl(fields, session, action, target) {
   const files = fields.getUploadedFiles(id(session, 'file', action, 'upload'), false);
   const file = files?.first?.();
@@ -177,6 +183,7 @@ async function handleModalSubmit(interaction, session, action, value) {
     'submit_modal_title', 'submit_modal_description', 'submit_modal_url', 'submit_modal_author', 'submit_modal_footer',
     'submit_modal_color', 'submit_modal_thumbnail', 'submit_modal_image', 'submit_modal_field_add', 'submit_field_edit',
     'submit_modal_button_external', 'submit_modal_button_channel', 'submit_button_edit', 'submit_modal_save',
+    'submit_modal_message_content',
   ]);
   if (!supportedActions.has(action)) throw new Error('Unknown builder modal.');
   const embed = session.configuration.embed;
@@ -194,6 +201,7 @@ async function handleModalSubmit(interaction, session, action, value) {
   }
 
   if (action === 'submit_modal_title') embed.title = valueOf('title');
+  if (action === 'submit_modal_message_content') session.configuration.content = readRaw(fields, session, editorAction, 'content').trim();
   if (action === 'submit_modal_description') embed.description = valueOf('description');
   if (action === 'submit_modal_url') embed.url = parseUrl(valueOf('url')) || '';
   if (action === 'submit_modal_author') {
@@ -280,7 +288,7 @@ async function handleButton(interaction) {
   }
 
   if (parsed.action === 'section') {
-    if (!['home', 'content', 'appearance', 'media', 'fields', 'buttons', 'settings'].includes(parsed.value)) throw new Error('That builder section is invalid.');
+    if (!['home', 'content', 'embed_content', 'appearance', 'media', 'fields', 'buttons', 'settings'].includes(parsed.value)) throw new Error('That builder section is invalid.');
     session.transition(parsed.value);
     await showBuilder(interaction, session);
     return true;
@@ -292,6 +300,12 @@ async function handleButton(interaction) {
   }
   if (parsed.action === 'clear_color') {
     session.configuration.embed.color = null;
+    session.changed();
+    await showBuilder(interaction, session);
+    return true;
+  }
+  if (parsed.action === 'clear_message_content') {
+    session.configuration.content = '';
     session.changed();
     await showBuilder(interaction, session);
     return true;
@@ -335,7 +349,7 @@ async function handleButton(interaction) {
     session.managedMessageUpdatedAt = updated.updated_at;
     session.saved = true;
     sessionManager.delete(session);
-    return interaction.editReply({ content: 'Managed message updated.', embeds: [toEmbed(session.configuration)], components: toButtonRows(session.configuration) });
+    return interaction.editReply({ content: 'Managed message updated.', embeds: toMessagePayload(session.configuration, { includeFiles: false }).embeds, components: toButtonRows(session.configuration) });
   }
   await showEditModal(interaction, session, parsed.action);
   return true;
@@ -384,6 +398,30 @@ async function handleSelect(interaction) {
     return showBuilder(interaction, session);
   }
 
+  if (parsed.action === 'insert_role_mention') {
+    const role = interaction.roles.first();
+    if (!role) throw new Error('The selected role is no longer available.');
+    session.configuration.content = appendMention(session.configuration.content, 'role', role.id);
+    session.changed();
+    return showBuilder(interaction, session);
+  }
+
+  if (parsed.action === 'insert_user_mention') {
+    const user = interaction.users.first();
+    if (!user) throw new Error('The selected user is no longer available.');
+    session.configuration.content = appendMention(session.configuration.content, 'user', user.id);
+    session.changed();
+    return showBuilder(interaction, session);
+  }
+
+  if (parsed.action === 'insert_channel_mention') {
+    const channel = interaction.channels.first();
+    if (!channel) throw new Error('The selected channel is no longer available.');
+    session.configuration.content = appendMention(session.configuration.content, 'channel', channel.id);
+    session.changed();
+    return showBuilder(interaction, session);
+  }
+
   if (parsed.action === 'send_channel_select') {
     const channel = interaction.channels.first();
     if (session.section !== 'choose_send_channel') throw new Error('That send selection is no longer active.');
@@ -393,7 +431,7 @@ async function handleSelect(interaction) {
     const record = await sendConfiguration({ guild: interaction.guild, channel, clientUser: interaction.client.user, configuration: session.configuration, templateName: session.templateName });
     logger.info(`Template "${session.templateName || 'draft'}" sent`, { channelId: channel.id, messageId: record.message_id });
     sessionManager.delete(session);
-    return interaction.editReply({ content: `Sent to #${channel.name}. Managed message ID: ${record.message_id}`, embeds: [toEmbed(session.configuration)], components: toButtonRows(session.configuration) });
+    return interaction.editReply({ content: `Sent to #${channel.name}. Managed message ID: ${record.message_id}`, embeds: toMessagePayload(session.configuration, { includeFiles: false }).embeds, components: toButtonRows(session.configuration) });
   }
 
   if (parsed.action === 'field_edit' || parsed.action === 'button_edit') {

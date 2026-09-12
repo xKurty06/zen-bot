@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 
 function emptyConfiguration() {
   return {
+    content: '',
     embed: {
       title: '',
       description: '',
@@ -25,7 +26,7 @@ class BuilderSession {
     this.guildId = guildId;
     this.userId = userId;
     this.templateName = templateName;
-    this.configuration = configuration;
+    this.configuration = { ...emptyConfiguration(), ...configuration, embed: { ...emptyConfiguration().embed, ...(configuration.embed || {}) }, buttons: configuration.buttons || [], mediaAssets: configuration.mediaAssets || {} };
     this.mode = mode;
     this.managedMessageId = managedMessageId;
     this.managedMessageUpdatedAt = managedMessageUpdatedAt;

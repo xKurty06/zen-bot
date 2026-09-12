@@ -1,10 +1,10 @@
 const { ChannelType } = require('discord.js');
-const { toEmbed, toButtonRows } = require('../embed-builder/renderer');
+const { toMessagePayload } = require('../embed-builder/renderer');
 const { assertValidConfiguration } = require('../embed-builder/validators');
 const managedMessageRepository = require('../database/repositories/managedMessageRepository');
 const templateRepository = require('../database/repositories/templateRepository');
 const { missingSendPermissions } = require('./permissionService');
-const { filesForConfiguration } = require('./mediaAssetService');
+const { extractMentionIds } = require('../utils/mentions');
 
 const managedMessageLocks = new Map();
 
@@ -34,8 +34,9 @@ async function sendConfiguration({ guild, channel, clientUser, configuration, te
   const missing = missingSendPermissions(channel, guild.members.me);
   if (missing.length) throw new Error('I am missing permissions in that channel. Required: View Channel, Send Messages, Embed Links, Read Message History.');
   assertValidConfiguration(configuration);
+  await assertMentionTargetsExist(guild, configuration.content);
 
-  const message = await channel.send({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), files: filesForConfiguration(configuration) });
+  const message = await channel.send(toMessagePayload(configuration));
   const template = templateName ? templateRepository.findByName(guild.id, templateName) : null;
   return managedMessageRepository.save({
     guildId: guild.id,
@@ -68,9 +69,10 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     }
     if (!message) throw new Error('The original message no longer exists.');
     if (message.author.id !== client.user.id) throw new Error('I will only edit messages created by this bot.');
+    await assertMentionTargetsExist(message.guild, configuration.content);
 
     try {
-      await message.edit({ embeds: [toEmbed(configuration)], components: toButtonRows(configuration), attachments: [], files: filesForConfiguration(configuration) });
+      await message.edit({ ...toMessagePayload(configuration), attachments: [] });
     } catch {
       throw new Error('I could not edit the original message. Check that I still have View Channel, Send Messages, and Embed Links permission.');
     }
@@ -87,7 +89,7 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
     if (saved) return saved;
 
     try {
-      await message.edit({ embeds: [toEmbed(current.configuration)], components: toButtonRows(current.configuration), attachments: [], files: filesForConfiguration(current.configuration) });
+      await message.edit({ ...toMessagePayload(current.configuration), attachments: [] });
     } catch {
       // The user receives a reconciliation warning below; do not hide the original persistence failure.
     }
@@ -95,4 +97,20 @@ async function updateManagedMessage({ client, guildId, managedRecord, configurat
   });
 }
 
-module.exports = { sendConfiguration, updateManagedMessage };
+async function assertMentionTargetsExist(guild, content) {
+  const mentions = extractMentionIds(content);
+  for (const roleId of mentions.roles) {
+    const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId).catch(() => null);
+    if (!role) throw new Error(`Message content contains a role mention for a deleted or unavailable role: ${roleId}`);
+  }
+  for (const channelId of mentions.channels) {
+    const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel) throw new Error(`Message content contains a channel mention for a deleted or unavailable channel: ${channelId}`);
+  }
+  for (const userId of mentions.users) {
+    const member = guild.members.cache.get(userId) || await guild.members.fetch(userId).catch(() => null);
+    if (!member) throw new Error(`Message content contains a user mention for a user that is not in this server: ${userId}`);
+  }
+}
+
+module.exports = { sendConfiguration, updateManagedMessage, assertMentionTargetsExist };
