@@ -1,8 +1,8 @@
 # Zen Bot
 
-Zen Bot is a locally hosted Discord.js bot for building and maintaining server information embeds. It acts like a Discord-native embed CMS: start it locally, create or update content, publish the message, then stop the bot.
+Zen Bot is a self-hosted Discord.js bot for building and maintaining server information embeds. It acts like a Discord-native embed CMS for creating, updating, and publishing server content.
 
-Previously posted messages remain visible when the bot is offline. Navigation buttons are Discord Link Buttons, including channel navigation links like `https://discord.com/channels/GUILD_ID/CHANNEL_ID`, so simple navigation keeps working without bot interactions.
+Previously posted messages remain visible when the bot is offline. Navigation buttons use Discord link buttons, so simple navigation keeps working without bot interactions.
 
 ## Features
 
@@ -47,6 +47,8 @@ DATABASE_PATH=
 `GUILD_ID` is recommended for local development because guild commands update quickly. `DATABASE_PATH` is optional and defaults to `data/bot.sqlite`.
 
 Never commit `.env`. It is ignored by git.
+
+Existing SQLite data is meant to be preserved. Do not delete the configured database file or point `DATABASE_PATH` at a new file unless you intentionally want a fresh bot database. Schema setup runs through the existing database initializer so templates, managed messages, notification configs, and milestone state can continue across restarts.
 
 ## Discord Developer Portal Setup
 
@@ -116,9 +118,13 @@ The live builder shows message content above the embed preview. Saved templates,
 
 For safety, final send/edit payloads use restricted `allowedMentions`: only user and role IDs present in the saved content are allowed to ping, and `@everyone` / `@here` are neutralized. Template preview suppresses pings.
 
+New embed builder drafts use the default Zentra color `#6E27E6`. Builder-created embeds also default to footer text `Zentra Team` and the configured Zentra footer icon. Older templates without footer data inherit these builder defaults when opened.
+
 ## Role Notifications
 
 `/notify` monitors how many human members currently have a selected role. Bots are not counted. The bot refreshes member data when checking counts, and configurations are scoped per server.
+
+When a member joins, notification checks wait 5 seconds before counting. This gives delayed auto-role bots time to finish assigning roles.
 
 Milestones are static relative to the configured target:
 
@@ -131,19 +137,21 @@ For target 500, the same static offsets become 480, 490, 495, and 500.
 
 Each milestone triggers once per notification cycle and is stored in SQLite, so already-sent alerts remain recorded after restart. Counts moving backward do not automatically reset progress; use `/notify reset id:<id>` when you intentionally want a fresh cycle.
 
+If the joining member receives a monitored role and that pushes the role over the target, the bot removes that role from the joining member only. For example, target 100 and count 101 becomes 100 again. The removal sends the configured notification and writes a compact audit embed with the member, role, config id, before/after count, and reason.
+
 `/notifytest` sends the configured notification appearance to the configured channel regardless of the current count. It does not mark milestones, reset progress, or change configuration.
 
 Notification configuration and test commands require the same management permission path as embed administration. `/rolecount` follows the permission-sync convention and requires Manage Channels, Manage Server, or Administrator.
 
 ## Offline Behavior
 
-The bot is designed for local administration sessions, not 24/7 automation.
+The bot is designed for self-hosted administration workflows.
 
 Slash commands, modals, selects, and builder controls require the bot to be running. Published embeds remain normal Discord messages when the bot is offline. Navigation buttons are stored as Discord Link Buttons, so channel navigation and external links continue to work after shutdown.
 
 Bot-dependent custom buttons are used only inside the ephemeral admin builder. They are not used for public navigation.
 
-Role notifications, `/notifytest`, and `/rolecount` require the bot to be online. Saved notification configurations and milestone state are restored from SQLite after restart, but automatic notification checks only run when Discord sends a new member join event.
+Role notifications, `/notifytest`, and `/rolecount` require the bot to be online. Saved notification configurations and milestone state are restored from SQLite after restart. Automatic notification checks and over-target role removal are join-event based.
 
 ## Notes And Limitations
 
@@ -151,4 +159,4 @@ Discord attachments can produce URLs that may not be suitable as permanent templ
 
 Managed-message editing only updates a selected tracked message. Saving a template does not automatically update every message created from it.
 
-Role notification checks run only when a new member joins the server. The bot does not poll, run timers, or react to role assignment/removal events for `/notify`.
+Role notification checks are event-based and lightweight. Manual checks remain available through `/notifytest` and `/rolecount`.
