@@ -3,6 +3,14 @@ const notificationRepository = require('../database/repositories/notificationRep
 const { mentionText } = require('../utils/mentions');
 
 const MILESTONES = [20, 10, 5, 0];
+const JOIN_NOTIFICATION_DELAY_MS = 5_000;
+const ROLE_REMOVAL_LOG_CHANNEL_ID = '1544608877616562256';
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 function milestoneFlag(milestone) {
   if (milestone === 20) return 'milestone_20_triggered';
@@ -54,6 +62,38 @@ function notificationEmbed(config, roleName, currentCount, milestone, test = fal
     .setTimestamp();
 }
 
+function overflowRemovalText(config, roleName, beforeCount, afterCount, member) {
+  return `${pingFor(config)} Role limit exceeded.\nRemoved ${roleName} from <@${member.id}>. Count: ${beforeCount} -> ${afterCount}/${config.target_count}.`;
+}
+
+function overflowRemovalEmbed(config, roleName, beforeCount, afterCount, member, reason) {
+  return new EmbedBuilder()
+    .setColor(0xED4245)
+    .setTitle('Role Limit Enforced')
+    .addFields(
+      { name: 'Role', value: roleName, inline: true },
+      { name: 'Count', value: `${beforeCount} -> ${afterCount}/${config.target_count}`, inline: true },
+      { name: 'Removed From', value: `<@${member.id}>`, inline: true },
+      { name: 'Reason', value: reason, inline: false },
+    )
+    .setTimestamp();
+}
+
+function roleRemovalLogEmbed(config, role, member, beforeCount, afterCount, reason) {
+  return new EmbedBuilder()
+    .setColor(0xED4245)
+    .setTitle('Monitored Role Removed')
+    .addFields(
+      { name: 'Member', value: `<@${member.id}>\n${member.user?.tag || member.id}`, inline: true },
+      { name: 'Role', value: `<@&${role.id}>\n${role.name}`, inline: true },
+      { name: 'Config', value: `#${config.id}`, inline: true },
+      { name: 'Count', value: `${beforeCount} -> ${afterCount}/${config.target_count}`, inline: true },
+      { name: 'Reason', value: reason, inline: false },
+    )
+    .setFooter({ text: `Member ID: ${member.id} | Role ID: ${role.id}` })
+    .setTimestamp();
+}
+
 async function sendNotification({ client, guild, config, milestone, test = false }) {
   const { role, count } = await countRoleMembers(guild, config.role_id);
   const channel = guild.channels.cache.get(config.channel_id) || await client.channels.fetch(config.channel_id).catch(() => null);
@@ -66,6 +106,27 @@ async function sendNotification({ client, guild, config, milestone, test = false
       : { parse: [], users: [config.ping_id], roles: [] },
   });
   return { role, count };
+}
+
+async function sendOverflowRemovalNotification({ client, guild, config, role, beforeCount, afterCount, member, reason }) {
+  const channel = guild.channels.cache.get(config.channel_id) || await client.channels.fetch(config.channel_id).catch(() => null);
+  if (!channel?.send) throw new Error('The notification channel no longer exists or is unavailable.');
+  await channel.send({
+    content: overflowRemovalText(config, role.name, beforeCount, afterCount, member),
+    embeds: [overflowRemovalEmbed(config, role.name, beforeCount, afterCount, member, reason)],
+    allowedMentions: config.ping_type === 'role'
+      ? { parse: [], roles: [config.ping_id], users: [member.id] }
+      : { parse: [], users: [config.ping_id, member.id], roles: [] },
+  });
+}
+
+async function sendRoleRemovalLog({ client, guild, config, role, beforeCount, afterCount, member, reason }) {
+  const channel = guild.channels.cache.get(ROLE_REMOVAL_LOG_CHANNEL_ID) || await client.channels.fetch(ROLE_REMOVAL_LOG_CHANNEL_ID).catch(() => null);
+  if (!channel?.send) return;
+  await channel.send({
+    embeds: [roleRemovalLogEmbed(config, role, member, beforeCount, afterCount, reason)],
+    allowedMentions: { parse: [] },
+  });
 }
 
 async function evaluateNotification(client, config) {
@@ -89,18 +150,53 @@ async function evaluateGuildNotifications(client, guildId) {
   return results;
 }
 
-async function handleGuildMemberAdd(client, member) {
-  return evaluateGuildNotifications(client, member.guild.id);
+async function enforceJoinedMemberRoleLimits(client, member) {
+  if (member.user?.bot) return [];
+  if (!member.id) return [];
+
+  const guild = member.guild;
+  const freshMember = await guild.members.fetch(member.id).catch(() => member);
+  if (!freshMember?.roles?.cache) return [];
+  const removals = [];
+
+  for (const config of notificationRepository.listEnabled(guild.id)) {
+    if (!freshMember.roles.cache.has(config.role_id)) continue;
+
+    const { role, count: beforeCount } = await countRoleMembers(guild, config.role_id);
+    if (beforeCount <= config.target_count) continue;
+
+    const reason = `Joined member overflowed monitored role target (${beforeCount}/${config.target_count}).`;
+    await freshMember.roles.remove(role, reason);
+    const { count: afterCount } = await countRoleMembers(guild, config.role_id);
+    await sendOverflowRemovalNotification({ client, guild, config, role, beforeCount, afterCount, member: freshMember, reason });
+    await sendRoleRemovalLog({ client, guild, config, role, beforeCount, afterCount, member: freshMember, reason });
+    removals.push({ configId: config.id, roleId: role.id, beforeCount, afterCount });
+  }
+
+  return removals;
+}
+
+async function handleGuildMemberAdd(client, member, options = {}) {
+  const delayMs = options.delayMs ?? JOIN_NOTIFICATION_DELAY_MS;
+  if (delayMs > 0) await wait(delayMs);
+  const removals = await enforceJoinedMemberRoleLimits(client, member);
+  const notifications = await evaluateGuildNotifications(client, member.guild.id);
+  return { removals, notifications };
 }
 
 module.exports = {
+  JOIN_NOTIFICATION_DELAY_MS,
   MILESTONES,
+  ROLE_REMOVAL_LOG_CHANNEL_ID,
   countRoleMembers,
+  enforceJoinedMemberRoleLimits,
   evaluateGuildNotifications,
   evaluateNotification,
   handleGuildMemberAdd,
   milestoneFlag,
   nextMilestone,
   notificationText,
+  overflowRemovalText,
+  roleRemovalLogEmbed,
   sendNotification,
 };
