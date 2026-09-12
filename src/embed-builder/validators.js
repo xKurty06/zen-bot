@@ -1,3 +1,5 @@
+const { DEFAULT_EMBED_COLOR } = require('../config/brand');
+
 const LIMITS = {
   title: 256,
   description: 4096,
@@ -84,7 +86,7 @@ function validateConfiguration(configuration) {
   validateUrl(errors, 'Embed URL', embed.url);
   validateUrl(errors, 'Thumbnail URL', embed.thumbnail, true);
   validateUrl(errors, 'Image URL', embed.image, true);
-  if (embed.color != null && (typeof embed.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(embed.color))) errors.push('Color must be a hex value like #5865F2.');
+  if (embed.color != null && (typeof embed.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(embed.color))) errors.push(`Color must be a hex value like ${DEFAULT_EMBED_COLOR}.`);
   if (embed.timestamp != null && typeof embed.timestamp !== 'boolean') errors.push('Timestamp must be a boolean.');
   if (embed.author != null && (typeof embed.author !== 'object' || Array.isArray(embed.author))) errors.push('Author must be an object.');
   if (embed.footer != null && (typeof embed.footer !== 'object' || Array.isArray(embed.footer))) errors.push('Footer must be an object.');

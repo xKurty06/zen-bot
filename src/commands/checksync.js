@@ -4,6 +4,7 @@ const {
 } = require('discord.js');
 const { assertCanCheckPermissionSync } = require('../services/permissionService');
 const logger = require('../utils/logger');
+const { DEFAULT_EMBED_COLOR_INT } = require('../config/brand');
 
 const MAX_CATEGORIES_PER_PAGE = 25;
 const MAX_CHANNELS_PER_PAGE = 12;
@@ -137,9 +138,9 @@ function controls(categories, categoryPage, selectedCategoryId, resultPage, chil
   return rows;
 }
 function buildPayload(categories, channels, categoryPage, selectedCategoryId, resultPage, guild) {
-  if (!categories.length) return { embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('🔐 Permission Sync Checker').setDescription('No categories were found in this server.')], components: [], allowedMentions: { parse: [] } };
+  if (!categories.length) return { embeds: [new EmbedBuilder().setColor(DEFAULT_EMBED_COLOR_INT).setTitle('🔐 Permission Sync Checker').setDescription('No categories were found in this server.')], components: [], allowedMentions: { parse: [] } };
   const category = categories.find((candidate) => candidate.id === selectedCategoryId);
-  if (!category) return { embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('🔐 Permission Sync Checker').setDescription('Select a category to check its channel permissions.')], components: controls(categories, categoryPage, null, 0, []), allowedMentions: { parse: [] } };
+  if (!category) return { embeds: [new EmbedBuilder().setColor(DEFAULT_EMBED_COLOR_INT).setTitle('🔐 Permission Sync Checker').setDescription('Select a category to check its channel permissions.')], components: controls(categories, categoryPage, null, 0, []), allowedMentions: { parse: [] } };
   const children = childrenForCategory(category, channels);
   const report = formatCategory(category, children, guild);
   const start = resultPage * MAX_CHANNELS_PER_PAGE;

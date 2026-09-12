@@ -10,6 +10,7 @@ const { handleButton, handleModalSubmit, showBuilder } = require('../src/interac
 const { id } = require('../src/embed-builder/renderer');
 const { canManageEmbeds } = require('../src/services/permissionService');
 const { formatUptime } = require('../src/commands/uptime');
+const { BUILDER_DEFAULT_FOOTER_ICON_URL, BUILDER_DEFAULT_FOOTER_TEXT, DEFAULT_EMBED_COLOR } = require('../src/config/brand');
 
 function ids(payload) {
   return payload.components.flatMap((row) => row.toJSON().components)
@@ -67,6 +68,25 @@ test('configuration validation rejects malformed fields, insecure button URLs, a
   assert.throws(() => validateComponentTree(new Array(6).fill({ components: [{}] })));
 });
 
+test('new embed builder drafts use Zentra color and footer defaults', () => {
+  const configuration = emptyConfiguration();
+  assert.equal(configuration.embed.color, DEFAULT_EMBED_COLOR);
+  assert.deepEqual(configuration.embed.footer, {
+    text: BUILDER_DEFAULT_FOOTER_TEXT,
+    iconUrl: BUILDER_DEFAULT_FOOTER_ICON_URL,
+  });
+  const embed = toEmbed(configuration).toJSON();
+  assert.equal(embed.color, 0x6E27E6);
+  assert.equal(embed.footer.text, BUILDER_DEFAULT_FOOTER_TEXT);
+  assert.equal(embed.footer.icon_url, BUILDER_DEFAULT_FOOTER_ICON_URL);
+});
+
+test('older configurations without footer inherit builder defaults when opened', () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user', configuration: { embed: { title: 'Existing' }, buttons: [] } });
+  assert.equal(session.configuration.embed.color, DEFAULT_EMBED_COLOR);
+  assert.equal(session.configuration.embed.footer.text, BUILDER_DEFAULT_FOOTER_TEXT);
+});
+
 test('message content is separate from embed description and controls allowed mentions', () => {
   const configuration = emptyConfiguration();
   configuration.content = 'Hello <@123456789012345678> <@&223456789012345678> <#323456789012345678> @everyone';
@@ -79,6 +99,7 @@ test('message content is separate from embed description and controls allowed me
 
 test('message-only configurations validate without requiring embed content', () => {
   const configuration = emptyConfiguration();
+  configuration.embed.footer = {};
   configuration.content = 'Plain **markdown** message';
   assert.deepEqual(validateConfiguration(configuration), []);
   assert.equal(toMessagePayload(configuration).embeds.length, 0);

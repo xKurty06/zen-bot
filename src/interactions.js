@@ -19,6 +19,7 @@ const { sendConfiguration, updateManagedMessage } = require('./services/messageS
 const managedMessageRepository = require('./database/repositories/managedMessageRepository');
 const logger = require('./utils/logger');
 const { appendMention } = require('./utils/mentions');
+const { DEFAULT_EMBED_COLOR } = require('./config/brand');
 
 function input(session, action, name, label, style = TextInputStyle.Short, value = '', required = false, maxLength = undefined) {
   const builder = new TextInputBuilder().setCustomId(id(session, 'input', action, name)).setLabel(label).setStyle(style).setRequired(required);
@@ -91,7 +92,7 @@ async function showEditModal(interaction, session, action, index = null) {
       formInput('iconUrl', 'Footer Icon URL (optional)', TextInputStyle.Short, embed.footer?.iconUrl, false, 500),
       fileInput(session, action),
     ]),
-    modal_color: () => modal(customId, 'Set Color', [formInput('color', 'Hex Color', TextInputStyle.Short, embed.color || '#5865F2', false, 7)]),
+    modal_color: () => modal(customId, 'Set Color', [formInput('color', 'Hex Color', TextInputStyle.Short, embed.color || DEFAULT_EMBED_COLOR, false, 7)]),
     modal_thumbnail: () => modal(customId, 'Set Thumbnail', [formInput('url', 'Image URL (optional)', TextInputStyle.Short, embed.thumbnail, false, 500), fileInput(session, action)]),
     modal_image: () => modal(customId, 'Set Main Image', [formInput('url', 'Image URL (optional)', TextInputStyle.Short, embed.image, false, 500), fileInput(session, action)]),
     modal_field_add: () => modal(customId, 'Add Field', [

@@ -1,6 +1,7 @@
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 const { countRoleMembers } = require('../services/notificationService');
 const { assertCanCheckPermissionSync } = require('../services/permissionService');
+const { DEFAULT_EMBED_COLOR_INT } = require('../config/brand');
 
 async function execute(interaction) {
   assertCanCheckPermissionSync(interaction);
@@ -10,7 +11,7 @@ async function execute(interaction) {
   await interaction.editReply({
     embeds: [
       new EmbedBuilder()
-        .setColor(0x5865F2)
+        .setColor(DEFAULT_EMBED_COLOR_INT)
         .setTitle('Role Count')
         .setDescription(`${result.role.name}\nCurrent holders: ${result.count} members`),
     ],

@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { BUILDER_DEFAULT_FOOTER_ICON_URL, BUILDER_DEFAULT_FOOTER_TEXT, DEFAULT_EMBED_COLOR } = require('../config/brand');
 
 function emptyConfiguration() {
   return {
@@ -7,9 +8,9 @@ function emptyConfiguration() {
       title: '',
       description: '',
       url: '',
-      color: null,
+      color: DEFAULT_EMBED_COLOR,
       author: {},
-      footer: {},
+      footer: { text: BUILDER_DEFAULT_FOOTER_TEXT, iconUrl: BUILDER_DEFAULT_FOOTER_ICON_URL },
       thumbnail: '',
       image: '',
       fields: [],
