@@ -9,8 +9,8 @@ async function execute(interaction) {
   const role = interaction.options.getRole('role', true);
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const result = await countRoleMembers(interaction.guild, role.id);
-  const verifiedResult = await countRoleMembers(interaction.guild, role.id, true);
-  const unverifiedCount = await countRoleMembers(interaction.guild, role.id, false);
+  const verifiedResult = await countTargetRoleMembers(interaction.guild, role.id, true);
+  const unverifiedCount = await countTargetRoleMembers(interaction.guild, role.id, false);
   await interaction.editReply({
     embeds: [
       new EmbedBuilder()
