@@ -78,7 +78,10 @@ async function showEditModal(interaction, session, action, index = null) {
 
   const modals = {
     modal_title: () => modal(customId, 'Edit Title', [formInput('title', 'Title', TextInputStyle.Short, embed.title, false, 256)]),
-    modal_message_content: () => modal(customId, 'Edit Message Content', [formInput('content', 'Message Content', TextInputStyle.Paragraph, session.configuration.content || '', false, 2000)]),
+    modal_message_content: () => modal(customId, 'Edit Message Content', [
+      formInput('content', 'Message Content', TextInputStyle.Paragraph, session.configuration.content || '', false, 2000),
+      fileInput(session, action),
+    ]),
     modal_description: () => modal(customId, 'Edit Description', [formInput('description', 'Description', TextInputStyle.Paragraph, embed.description, false, 4000)]),
     modal_url: () => modal(customId, 'Edit Title URL', [formInput('url', 'URL', TextInputStyle.Short, embed.url, false, 500)]),
     modal_author: () => modal(customId, 'Edit Author', [
@@ -154,10 +157,14 @@ function uploadedImageUrl(fields, session, action, target) {
   if (uploadUrl.protocol !== 'https:' || !['cdn.discordapp.com', 'media.discordapp.net'].includes(uploadUrl.hostname)) {
     throw new Error('The uploaded image URL is not a trusted Discord attachment.');
   }
-  const previousTarget = { image: 'image', thumbnail: 'thumbnail', authorIcon: 'authorIcon', footerIcon: 'footerIcon' }[target];
+  const previousTarget = { image: 'image', thumbnail: 'thumbnail', authorIcon: 'authorIcon', footerIcon: 'footerIcon', contentImage: 'contentImage' }[target];
   const previousValue = previousTarget === 'authorIcon'
     ? session.configuration.embed.author?.iconUrl
-    : previousTarget === 'footerIcon' ? session.configuration.embed.footer?.iconUrl : session.configuration.embed[previousTarget];
+    : previousTarget === 'footerIcon'
+      ? session.configuration.embed.footer?.iconUrl
+      : previousTarget === 'contentImage'
+        ? session.configuration.contentImage
+        : session.configuration.embed[previousTarget];
   const previousFilename = previousValue?.startsWith('attachment://') ? previousValue.slice('attachment://'.length) : null;
   if (previousFilename) delete session.configuration.mediaAssets?.[previousFilename];
   if (file.size != null && file.size > 25 * 1024 * 1024) throw new Error('Please upload an image smaller than 25 MB.');
@@ -192,7 +199,7 @@ async function handleModalSubmit(interaction, session, action, value) {
   const index = value !== '' ? Number(value) : null;
   const editorAction = action.replace(/^submit_/, '');
   const valueOf = (name) => read(fields, session, editorAction, name);
-  const uploadActions = new Set(['modal_author', 'modal_footer', 'modal_thumbnail', 'modal_image']);
+  const uploadActions = new Set(['modal_author', 'modal_footer', 'modal_thumbnail', 'modal_image', 'modal_message_content']);
   const uploadedFiles = uploadActions.has(editorAction)
     ? fields.getUploadedFiles(id(session, 'file', editorAction, 'upload'), false)
     : null;
@@ -202,7 +209,12 @@ async function handleModalSubmit(interaction, session, action, value) {
   }
 
   if (action === 'submit_modal_title') embed.title = valueOf('title');
-  if (action === 'submit_modal_message_content') session.configuration.content = readRaw(fields, session, editorAction, 'content').trim();
+  if (action === 'submit_modal_message_content') {
+    const uploaded = uploadedImageUrl(fields, session, editorAction, 'contentImage');
+    if (!uploaded) clearAttachmentReference(session, session.configuration.contentImage);
+    session.configuration.contentImage = uploaded || '';
+    session.configuration.content = readRaw(fields, session, editorAction, 'content').trim();
+  }
   if (action === 'submit_modal_description') embed.description = valueOf('description');
   if (action === 'submit_modal_url') embed.url = parseUrl(valueOf('url')) || '';
   if (action === 'submit_modal_author') {
@@ -306,7 +318,9 @@ async function handleButton(interaction) {
     return true;
   }
   if (parsed.action === 'clear_message_content') {
+    clearAttachmentReference(session, session.configuration.contentImage);
     session.configuration.content = '';
+    session.configuration.contentImage = '';
     session.changed();
     await showBuilder(interaction, session);
     return true;

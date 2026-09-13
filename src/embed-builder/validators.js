@@ -74,10 +74,12 @@ function validateConfiguration(configuration) {
   const fields = embed.fields || [];
   const buttons = configuration.buttons || [];
   const content = configuration.content || '';
+  const contentImage = configuration.contentImage || '';
   const errors = [];
   if (!Array.isArray(fields)) return ['Embed fields must be a list.'];
   if (!Array.isArray(buttons)) return ['Embed buttons must be a list.'];
   validateText(errors, 'Message content', content);
+  validateText(errors, 'Content image URL', contentImage);
   validateText(errors, 'Title', embed.title);
   validateText(errors, 'Description', embed.description);
   validateText(errors, 'Embed URL', embed.url);
@@ -86,6 +88,7 @@ function validateConfiguration(configuration) {
   validateUrl(errors, 'Embed URL', embed.url);
   validateUrl(errors, 'Thumbnail URL', embed.thumbnail, true);
   validateUrl(errors, 'Image URL', embed.image, true);
+  validateUrl(errors, 'Content image URL', contentImage, true);
   if (embed.color != null && (typeof embed.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(embed.color))) errors.push(`Color must be a hex value like ${DEFAULT_EMBED_COLOR}.`);
   if (embed.timestamp != null && typeof embed.timestamp !== 'boolean') errors.push('Timestamp must be a boolean.');
   if (embed.author != null && (typeof embed.author !== 'object' || Array.isArray(embed.author))) errors.push('Author must be an object.');
@@ -103,7 +106,8 @@ function validateConfiguration(configuration) {
     embed.footer?.text ||
     embed.thumbnail ||
     embed.image ||
-    fields.length,
+    fields.length ||
+    contentImage,
   );
 
   if (!hasEmbedContent && !String(content || '').trim()) {

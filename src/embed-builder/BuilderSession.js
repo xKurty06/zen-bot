@@ -4,6 +4,7 @@ const { BUILDER_DEFAULT_FOOTER_ICON_URL, BUILDER_DEFAULT_FOOTER_TEXT, DEFAULT_EM
 function emptyConfiguration() {
   return {
     content: '',
+    contentImage: '',
     embed: {
       title: '',
       description: '',

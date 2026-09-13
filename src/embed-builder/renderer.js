@@ -115,7 +115,7 @@ function statusContent(session) {
     `Status: ${session.saved ? 'Saved' : 'Unsaved'}`,
     `Section: ${session.section}`,
     '',
-    'Media tip: use Set Thumbnail, Set Image, Edit Author, or Edit Footer to paste a URL or upload an image directly in the modal.',
+    'Media tip: use Edit Message Content, Set Thumbnail, Set Image, Edit Author, or Edit Footer to paste a URL or upload an image directly in the modal.',
     buttonSummary(session.configuration),
     errors.length ? `\nValidation:\n${errors.slice(0, 4).join('\n')}` : '',
   ].filter(Boolean).join('\n');

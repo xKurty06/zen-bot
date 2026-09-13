@@ -10,6 +10,7 @@ function filesForConfiguration(configuration) {
   const embed = configuration?.embed || {};
   const assets = configuration?.mediaAssets || {};
   const filenames = new Set([
+    attachmentFilename(configuration?.contentImage),
     attachmentFilename(embed.image),
     attachmentFilename(embed.thumbnail),
     attachmentFilename(embed.author?.iconUrl),

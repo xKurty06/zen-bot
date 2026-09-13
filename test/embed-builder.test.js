@@ -107,6 +107,48 @@ test('message-only configurations validate without requiring embed content', () 
   assert.match(validateConfiguration(configuration).join('\n'), /Message content is too long/);
 });
 
+test('message content modals can attach uploaded images and include them in the sent payload', async () => {
+  const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
+  const manager = require('../src/embed-builder/sessionManager');
+  manager.sessions?.clear?.();
+  manager.sessions?.set?.(manager.key(session.guildId, session.userId, session.id), session);
+  const shown = [];
+  await handleButton({
+    guildId: 'guild',
+    user: { id: 'user' },
+    customId: id(session, 'button', 'modal_message_content'),
+    showModal: async (modal) => shown.push(modal.toJSON()),
+  });
+  const uploads = shown[0].components
+    .map((component) => component.component)
+    .filter((component) => component?.type === 19);
+  assert.equal(uploads.length, 1, 'message content modal should include an upload control');
+
+  const calls = [];
+  const interaction = {
+    guildId: 'guild',
+    user: { id: 'user' },
+    fields: {
+      getTextInputValue: () => 'Check out this image',
+      getUploadedFiles: () => ({ first: () => ({
+        contentType: 'image/png',
+        size: 2048,
+        url: 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc',
+      }) }),
+    },
+    deferUpdate: async () => { interaction.deferred = true; calls.push('defer'); },
+    editReply: async (payload) => calls.push(payload),
+    update: async (payload) => calls.push(payload),
+    deferred: false,
+    replied: false,
+  };
+
+  await handleModalSubmit(interaction, session, 'submit_modal_message_content', '');
+  assert.match(session.configuration.contentImage, /^attachment:\/\//);
+  assert.equal(session.configuration.content, 'Check out this image');
+  assert.equal(toMessagePayload(session.configuration).files.length, 1);
+});
+
 test('session lookup never falls back when a stale component provides a session ID', () => {
   const manager = new SessionManager();
   const active = manager.create({ guildId: 'guild', userId: 'user' });
