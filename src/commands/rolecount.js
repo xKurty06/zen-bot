@@ -27,10 +27,14 @@ async function countTargetRoleMembers(guild, roleId, verified=true) {
   if (guild.members.fetch) await guild.members.fetch().catch(() => null);
   const members = guild.members.cache.filter((member) => !member.user?.bot && member.roles.cache.has(roleId));
   if (verified) {
-    const verifiedMembers = members.filter((member) => member.roles.cache.has(verifiedRoleId));
-    return { role, count: verifiedMembers.size };
+    const verifiedRole = guild.roles.cache.get(verifiedRoleId) || await guild.roles.fetch(verifiedRoleId).catch(() => null);
+    if (!verifiedRole) throw new Error('The verified role no longer exists.');
+    return { role, count: members.filter((member) => member.roles.cache.has(verifiedRole.id)).size };
+  } else {
+    const verifiedRole = guild.roles.cache.get(verifiedRoleId) || await guild.roles.fetch(verifiedRoleId).catch(() => null);
+    if (!verifiedRole) throw new Error('The verified role no longer exists.');
+    return { role, count: members.filter((member) => !member.roles.cache.has(verifiedRole.id)).size };
   }
-  return { role, count: members.size - members.filter((member) => member.roles.cache.has(verifiedRoleId)).size };
 }
 
 
