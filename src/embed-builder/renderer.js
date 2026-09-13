@@ -35,10 +35,17 @@ function hasContent(source) {
   );
 }
 
+function hasMessageContent(configuration) {
+  return Boolean(
+    (configuration?.content || '').trim() ||
+    configuration?.contentImage
+  );
+}
+
 function toEmbed(configuration, options = {}) {
   const source = configuration.embed;
   const embed = new EmbedBuilder();
-  if (options.draft && !hasContent(source)) {
+  if (options.draft && !hasContent(source) && !hasMessageContent(configuration)) {
     embed.setDescription('Draft preview: use the controls below to add embed content.');
     return embed;
   }

@@ -107,6 +107,15 @@ test('message-only configurations validate without requiring embed content', () 
   assert.match(validateConfiguration(configuration).join('\n'), /Message content is too long/);
 });
 
+test('draft previews keep uploaded content images visible even when the embed was empty before', () => {
+  const configuration = emptyConfiguration();
+  configuration.contentImage = 'attachment://11111111-1111-4111-8111-111111111111.png';
+  configuration.mediaAssets = { '11111111-1111-4111-8111-111111111111.png': 'https://cdn.discordapp.com/attachments/1/2/banner.png?sig=abc' };
+  const draft = toEmbed(configuration, { draft: true }).toJSON();
+  assert.equal(draft.description, undefined);
+  assert.equal(renderBuilder({ configuration, id: 'session', revision: 0, section: 'content', mediaDirty: true }).files.length, 1);
+});
+
 test('message content modals can attach uploaded images and include them in the sent payload', async () => {
   const session = new BuilderSession({ guildId: 'guild', userId: 'user' });
   const manager = require('../src/embed-builder/sessionManager');
