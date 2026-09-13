@@ -30,7 +30,7 @@ async function countTargetRoleMembers(guild, roleId, verified=true) {
     const verifiedMembers = members.filter((member) => member.roles.cache.has(verifiedRoleId));
     return { role, count: verifiedMembers.size };
   }
-  return { role, count: members.size };
+  return { role, count: members.size - members.filter((member) => member.roles.cache.has(verifiedRoleId)).size };
 }
 
 
